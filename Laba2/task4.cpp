@@ -1,4 +1,6 @@
 //ЗАДАНИЕ 4
+#include<iostream>
+using namespace std;
 struct Massiv {
     int* num;
     int size;
