@@ -1,7 +1,6 @@
 #include "head.h"
 //ДВУСВЯЗНЫЙ
-void CreateGroup(Group*& List, Group*& tail, string str) //Создание
-{
+void CreateGroup(Group*& List, Group*& tail, string str) {//Создание
     List = new Group{str, nullptr, nullptr};
     tail = List;
 }
@@ -122,7 +121,6 @@ void otherPrintGroup(Group* ptr) {
     otherPrintGroup(ptr->next); 
     cout << ptr->student << " "; 
 }
-
 bool poiskGroup(Group* ptr, string str) { //Поиск элемента по значению (есть или нет)
     Group* element = ptr;
     while (element != nullptr) {
