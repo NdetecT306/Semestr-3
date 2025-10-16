@@ -15,10 +15,10 @@ int minW = 0;
 int currentSize = 0;  
 int C = 0;     
 int hash1(int key) {
-    return abs(key) % HASH_SIZE;
+    return key % HASH_SIZE;
 }
 int hash2(int key) {
-    return 13 - (abs(key) % 13);
+    return 13 - (key % 13);
 }
 void CREATE(int cap) {
     C = cap;
@@ -80,7 +80,7 @@ int findInsertSlot(int key) {
     if (firstDeleted != -1) {
         return firstDeleted;
     }
-    return -1; // Нет места
+    return -1; 
 }
 bool SET(int key, int value) {
     int existingIndex = findKeyIndex(key);
@@ -92,7 +92,7 @@ bool SET(int key, int value) {
     if (currentSize >= C) {
         int lfuIndex = findLFUNode();
         if (lfuIndex == -1) {
-            return false; // Не удалось найти элемент для удаления
+            return false; 
         }
         hashTable[lfuIndex].emp = true;
         hashTable[lfuIndex].del = true;
@@ -122,7 +122,7 @@ int GET(int key) {
 bool DELETE(int key) {
     int ind = findKeyIndex(key);
     if (ind == -1) {
-        return false; // Ключ не найден
+        return false; 
     }
     hashTable[ind].del = true;
     hashTable[ind].emp = true;
@@ -143,5 +143,29 @@ void updateMinFrequency() {
     }
 }
 int main() {
+    int cap;
+    cout << "Емкость: ";
+    cin >> cap;
+    int Q;
+    cout << "Кол-во запросов: ";
+    cin >> Q;
+    CREATE(cap);
+    cout << "Введите команду (SET key str or GET key):" << endl;
+    for(int i = 0; i < Q; i++) {
+        string command;
+        cin >> command;
+        if(command == "SET") {
+            int key, str;
+            cin >> key >> str;
+            SET(key, str);
+        }
+        else if(command == "GET") {
+            int key;
+            cin >> key;
+            int result = GET(key);
+            cout << result << " ";
+        }
+    }
+    cout << endl;
     return 0;
 }
