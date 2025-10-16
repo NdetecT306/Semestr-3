@@ -36,19 +36,16 @@ string TGET(const string& treeName) {
     if (trees[treeName] == nullptr) {
         return "Дерево пустое";
     }
-    
     stringstream output;
     auto old_cout_buffer = cout.rdbuf(output.rdbuf());
-    BFS(trees[treeName]); // Обход в ширину для сохранения в файл
+    BFS(trees[treeName]); 
     cout.rdbuf(old_cout_buffer);
-    
     string result = output.str();
     if (!result.empty() && result.back() == '\n') {
         result.pop_back();
     }
     return result;
 }
-
 string TGETSYM(const string& treeName) {
     if (trees.find(treeName) == trees.end()) {
         return "Дерево не найдено";
@@ -56,12 +53,10 @@ string TGETSYM(const string& treeName) {
     if (trees[treeName] == nullptr) {
         return "Дерево пустое";
     }
-    
     stringstream output;
     auto old_cout_buffer = cout.rdbuf(output.rdbuf());
     symmetrical(trees[treeName]); // Симметричный обход
     cout.rdbuf(old_cout_buffer);
-    
     string result = output.str();
     if (!result.empty() && result.back() == '\n') {
         result.pop_back();
@@ -75,6 +70,30 @@ string TDEL(const string& treeName, int value) {
         bool success = deleteNode(trees[treeName], value);
         return success ? to_string(value) : "Элемент не найден или невозможно удалить";
     }
+}
+void printTreeStructure(Tree* node, stringstream& output, const string& prefix, bool isLeft) {
+    if (node == nullptr) return;
+    output << prefix;
+    output << (isLeft ? "├----- " : "└----- ");
+    output << node->value << (node->color == RED ? "r" : "b") << endl;
+    string newPrefix = prefix + (isLeft ? "│   " : "    ");
+    printTreeStructure(node->left, output, newPrefix, true);
+    printTreeStructure(node->right, output, newPrefix, false);
+}
+string TREAD(const string& treeName) {
+    if (trees.find(treeName) == trees.end()) {
+        return "Дерево не найдено";
+    }
+    if (trees[treeName] == nullptr) {
+        return "Дерево пустое";
+    }
+    stringstream output;
+    printTreeStructure(trees[treeName], output, "", true);
+    string result = output.str();
+    if (!result.empty() && result.back() == '\n') {
+        result.pop_back();
+    }
+    return result;
 }
 string LPOISK(const string& groupName, const string& str) {
     if (groups.find(groupName) == groups.end()) {
@@ -95,7 +114,6 @@ string LPOPVALUE(const string& groupName, const string& str) {
 }
 string LPUSHBEGIN(const string& groupName, const string& str) {
     if (groups.find(groupName) == groups.end()) {
-        // Создаем новый список если не существует
         GroupPoint* newGroup = new GroupPoint;
         CreateGroup(newGroup->head, newGroup->tail, str);
         groups[groupName] = newGroup;
@@ -480,37 +498,29 @@ string FGET(const string& listName) {
     }
     return result;
 }
-// Вспомогательная функция для сохранения дерева в порядке BFS с использованием вашего BFS
+void saveTreeLevel(Tree* root, int level, ofstream& file) {
+    if (root == nullptr) return;
+    
+    if (level == 1) {
+        file << " " << root->value << (root->color == RED ? "r" : "b");
+    } else if (level > 1) {
+        saveTreeLevel(root->left, level - 1, file);
+        saveTreeLevel(root->right, level - 1, file);
+    }
+}
 void saveTreeBFS(Tree* root, ofstream& file) {
     if (root == nullptr) return;
-    stringstream output;
-    auto old_cout_buffer = cout.rdbuf(output.rdbuf());
-    BFS(root);
-    cout.rdbuf(old_cout_buffer);
-    string bfsResult = output.str();
-    istringstream iss(bfsResult);
-    string token;
-
-    while (iss >> token) {
-        // token имеет формат "15r" или "20b", преобразуем в "15:r" "20:b"
-        string value, color;
-        for (char c : token) {
-            if (isdigit(c) || c == '-') {
-                value += c;
-            } else {
-                color = c;
-            }
-        }
-        file << " " << value << ":" << color;
+    int height = getHeight(root);
+    for (int level = 1; level <= height; level++) {
+        saveTreeLevel(root, level, file);
     }
 }
 void saveToFile(const string& filename) { 
     ofstream file(filename);
     if (!file.is_open()) {
-        cerr << "Ошибка открытия файла с именем " << filename << endl;
+        cerr << "Ошибка открытия файла"<< endl;
         return;
     }
-    
     file << "[M]" << endl;
     for (const auto& pair : arrays) {
         file << pair.first << " " << pair.second.C << " " << pair.second.size;
@@ -519,7 +529,6 @@ void saveToFile(const string& filename) {
         }
         file << endl;
     }
-    
     file << "\n[Q]" << endl;
     for (const auto& pair : queues) {
         file << pair.first;
@@ -530,7 +539,6 @@ void saveToFile(const string& filename) {
         }
         file << endl;
     }
-    
     file << "\n[S]" << endl;
     for (const auto& pair : stacks) {
         file << pair.first;
@@ -545,7 +553,6 @@ void saveToFile(const string& filename) {
         }
         file << endl;
     }
-    
     file << "\n[L]" << endl;
     for (const auto& pair : lists) {
         file << pair.first;
@@ -556,7 +563,6 @@ void saveToFile(const string& filename) {
         }
         file << endl;
     }
-    
     file << "\n[F]" << endl;
     for (const auto& pair : groups) {
         file << pair.first;
@@ -567,20 +573,14 @@ void saveToFile(const string& filename) {
         }
         file << endl;
     }
-    
-    // ИСПРАВЛЕННАЯ СЕКЦИЯ ДЛЯ СОХРАНЕНИЯ ДЕРЕВЬЕВ В ШИРИНУ
     file << "\n[T]" << endl;
     for (const auto& pair : trees) {
         file << pair.first;
-        // Сохраняем дерево в порядке обхода в ширину (BFS) используя вашу функцию
         saveTreeBFS(pair.second, file);
         file << endl;
     }
-    
     file.close();
 }
-
-
 void loadFromFile(const string& filename) {
     ifstream file(filename);
     if (!file.is_open()) {
@@ -748,47 +748,47 @@ void loadFromFile(const string& filename) {
             string treeName;
             if (iss >> treeName) {
                 trees[treeName] = nullptr;
-                
-                string valueColor;
-                while (iss >> valueColor) {
-                    // Парсим строку формата "значение:цвет"
-                    size_t colonPos = valueColor.find(':');
-                    if (colonPos != string::npos) {
-                        int value = stoi(valueColor.substr(0, colonPos));
-                        char colorChar = valueColor[colonPos + 1];
-                        
+                string valueWithColor;
+                while (iss >> valueWithColor) {
+                    string valueStr;
+                    char colorChar;
+                    for (char c : valueWithColor) {
+                        if (isdigit(c) || c == '-') {
+                            valueStr += c;
+                        } 
+                        else {
+                            colorChar = c;
+                            break;
+                        }
+                    }   
+                    if (!valueStr.empty()) {
+                        int value = stoi(valueStr);
                         if (trees[treeName] == nullptr) {
-                            // Создаем корень
                             trees[treeName] = CreateRoot(value);
                             trees[treeName]->color = (colorChar == 'r') ? RED : BLACK;
-                        } else {
-                            // Добавляем лист с указанным цветом
+                        } 
+                        else {
                             Tree* newNode = CreateNode(value);
                             newNode->color = (colorChar == 'r') ? RED : BLACK;
-                            
-                            // Вставляем узел в дерево используя ваш алгоритм
                             Tree* current = trees[treeName];
                             Tree* parent = nullptr;
-                            
                             while (current != nullptr) {
-                                parent = current;
-                                if (value < current->value) {
-                                    current = current->left;
-                                } else {
-                                    current = current->right;
-                                }
+                            parent = current;
+                            if (value < current->value) {
+                                current = current->left;
+                            } 
+                            else {
+                                current = current->right;
                             }
-                            
-                            newNode->parent = parent;
-                            if (value < parent->value) {
-                                parent->left = newNode;
-                            } else {
-                                parent->right = newNode;
-                            }
-                            
-                            // Балансируем если нужно
-                            if (newNode->color == RED && parent->color == RED) {
-                                fixInsert(trees[treeName], newNode);
+                        }
+                        newNode->parent = parent;
+                        if (value < parent->value) {
+                            parent->left = newNode;
+                        } else {
+                            parent->right = newNode;
+                        }
+                        if (newNode->color == RED && parent->color == RED) {
+                            fixInsert(trees[treeName], newNode);
                             }
                         }
                     }
@@ -995,14 +995,13 @@ string processStackQueueCommand(const string& command, istringstream& iss, const
 string processTreeCommand(const string& command, istringstream& iss, const string& filename) {
     string treeName;
     iss >> treeName;
-    
     string result;
     if (command == "TADD") {
         int value;
         if (!(iss >> value)) return "ОШИБКА";
         result = TADD(treeName, value);
     }
-    else if (command == "TDEL") {  // ДОБАВЛЕНА НОВАЯ КОМАНДА
+    else if (command == "TDEL") {
         int value;
         if (!(iss >> value)) return "ОШИБКА";
         result = TDEL(treeName, value);
@@ -1023,18 +1022,19 @@ string processTreeCommand(const string& command, istringstream& iss, const strin
     else if (command == "TGETSYM") {
         result = TGETSYM(treeName);
     }
+    else if (command == "TREAD") {  
+        result = TREAD(treeName);
+    }
     else {
         return "Неизвестная команда";
     }
-    
-    // Сохраняем в файл после успешных операций
-    if (result != "Дерево не найдено" && 
+    if (command != "TREAD" && command != "TGET" && command != "TGETSYM" && command != "TSEARCH" &&
+        result != "Дерево не найдено" && 
         result != "Элемент не найден или невозможно удалить" &&
         result != "ОШИБКА" &&
         !result.empty()) {
         saveToFile(filename);
     }
-    
     return result;
 }
 string processQuery(const string& query, const string& filename) {
