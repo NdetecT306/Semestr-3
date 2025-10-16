@@ -130,7 +130,6 @@ int findMinDifference(int* keys, int count, int totalSum) {
             break;
         }
     }
-    
     return minRaz;
 }
 void findSubsets(int* keys, int count, int minDiff, int totalSum, int* subset1, int& count1, int* subset2, int& count2) {
@@ -181,7 +180,7 @@ void partitionSet() {
         cout << "Множество пусто!" << endl;
         return;
     }
-    cout << "Исходное множество: {";
+    cout << "Ваше s: {";
     for (int i = 0; i < count; i++) {
         cout << keys[i];
         if (i < count - 1) cout << ", ";
@@ -192,19 +191,17 @@ void partitionSet() {
     int subset1[HASH_SIZE], subset2[HASH_SIZE];
     int count1 = 0, count2 = 0;
     findSubsets(keys, count, minDiff, totalSum, subset1, count1, subset2, count2);
-    cout << "Подмножество 1: {";
+    cout << "Подмножество s1: {";
     for (int i = 0; i < count1; i++) {
         cout << subset1[i];
         if (i < count1 - 1) cout << ", ";
     }
-    cout << "} (сумма = " << calculateArraySum(subset1, count1) << ")" << endl;
-    cout << "Подмножество 2: {";
+    cout << "}\nПодмножество s2: {";
     for (int i = 0; i < count2; i++) {
         cout << subset2[i];
         if (i < count2 - 1) cout << ", ";
     }
-    cout << "} (сумма = " << calculateArraySum(subset2, count2) << ")" << endl;
-    cout << "Разница сумм = " << minDiff << endl;
+    cout << "}\nРазница сумм = " << minDiff << endl;
 }
 int main() {
     setlocale(LC_ALL, "rus");
@@ -216,7 +213,7 @@ int main() {
     for (int i = 0; i < n; i++) {
         int num;
         cin >> num;
-        ADD(num, num); // Используем ключ и значение одинаковыми
+        ADD(num, num); 
     }
     cout << "\nРезультат разбиения множества:" << endl;
     partitionSet();
