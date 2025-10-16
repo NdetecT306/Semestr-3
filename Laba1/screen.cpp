@@ -68,6 +68,14 @@ string TGETSYM(const string& treeName) {
     }
     return result;
 }
+string TDEL(const string& treeName, int value) {
+    if (trees.find(treeName) == trees.end()) {
+        return "Дерево не найдено";
+    } else {
+        bool success = deleteNode(trees[treeName], value);
+        return success ? to_string(value) : "Элемент не найден или невозможно удалить";
+    }
+}
 string LPOISK(const string& groupName, const string& str) {
     if (groups.find(groupName) == groups.end()) {
         return "Двусвязный список не найден";
@@ -993,6 +1001,11 @@ string processTreeCommand(const string& command, istringstream& iss, const strin
         int value;
         if (!(iss >> value)) return "ОШИБКА";
         result = TADD(treeName, value);
+    }
+    else if (command == "TDEL") {  // ДОБАВЛЕНА НОВАЯ КОМАНДА
+        int value;
+        if (!(iss >> value)) return "ОШИБКА";
+        result = TDEL(treeName, value);
     }
     else if (command == "TSEARCH") {
         int value;
