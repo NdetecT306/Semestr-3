@@ -1,4 +1,6 @@
 // ЗАДАНИЕ 1
+#include <iostream>
+using namespace std;
 enum DIR { Right, Left };
 struct Pair
 {
@@ -80,7 +82,7 @@ void readMas(Massiv& A) { //Чтение
     }
     cout << endl;
 }
-void Transformation(Massiv& A) {
+void Transformation(Massiv& A) { //Все столкновения астероидов
     bool crash;
     do {
         crash = false;
@@ -131,10 +133,10 @@ int main()
         cout << "Направление астероида " << num << ": ";
         cin >> dir;
         DIR direction;
-        if (dir == "right") {
+        if (dir == "right" || dir == "Right") {
             direction = Right;
         }
-        else if (dir == "left") {
+        else if (dir == "left" || dir == "Left") {
             direction = Left;
         }
         else {
