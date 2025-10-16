@@ -5,14 +5,12 @@ void createMas(Numbers& A, int C) {
     A.size = 0; // изначально элементов нет
     A.C = C;
 }
-// Добавить элемент по индексу
-void addMasAtInd(Numbers& A, int ind, string znach) {
+void addMasAtInd(Numbers& A, int ind, string znach) {// Добавить элемент по индексу
     if (ind < 0 || ind >= A.C) {
         cout << "Индекс вне диапазона емкости массива." << endl;
         return;
     }
     if (ind >= A.size) {
-        // Заполняем промежуточные элементы пустыми строками, если есть пропуск
         for (int i = A.size; i < ind; i++) {
             A.num[i] = "";
         }
@@ -20,8 +18,7 @@ void addMasAtInd(Numbers& A, int ind, string znach) {
     }
     A.num[ind] = znach;
 }
-// Добавить элемент в конец
-void addMasAtEnd(Numbers& A, string znach) {
+void addMasAtEnd(Numbers& A, string znach) {// Добавить элемент в конец
     if (A.size >= A.C) {
         cout << "Массив заполнен." << endl;
         return;
@@ -29,38 +26,33 @@ void addMasAtEnd(Numbers& A, string znach) {
     A.num[A.size] = znach;
     A.size++;
 }
-// Получить элемент по индексу (вывод)
-void poiskMasPoInd(Numbers& A, int ind) {
+void poiskMasPoInd(Numbers& A, int ind) {// Получить элемент по индексу (вывод)
     if (ind < 0 || ind >= A.size) {
         cout << "Выход за границы массива." << endl;
         return;
     }
     cout << A.num[ind] << endl;
 }
-// Удалить элемент по индексу
-void deleteMasPoInd(Numbers& A, int ind) {
+void deleteMasPoInd(Numbers& A, int ind) {// Удалить элемент по индексу
     if (ind < 0 || ind >= A.size) {
-        return; // Некорректный индекс
+        return; 
     }
     for (int i = ind; i < A.size - 1; i++) {
         A.num[i] = A.num[i + 1];
     }
     A.size--; // Уменьшаем размер
 }
-// Заменить элемент по индексу
-void ZamenaMas(Numbers& A, int ind, string znach) {
+void ZamenaMas(Numbers& A, int ind, string znach) {// Заменить элемент по индексу
     if (ind < 0 || ind >= A.size) {
         cout << "Нельзя заменить то что не существует." << endl;
         return;
     }
     A.num[ind] = znach;
 }
-// Получить размер массива
-void RazmerMas(Numbers& A) {
+void RazmerMas(Numbers& A) {// Получить размер массива
     cout << A.size << endl;
 }
-// Вывести все элементы массива
-void readMas(Numbers& A) {
+void readMas(Numbers& A) {// Вывести все элементы массива
     if (A.size == 0) {
         cout << "Массив пустой, Ваша честь." << endl;
         return;
