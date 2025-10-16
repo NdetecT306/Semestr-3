@@ -1,23 +1,20 @@
-//ЗАДАНИЕ 5
+#include "head.h"
 enum Color { RED, BLACK }; // 2 цвета
-struct Tree //составляющие дерева
-{
+struct Tree {//составляющие дерева
     int value;
     Color color;
     Tree* left;
     Tree* right;
     Tree* parent;
 };
-bool ifZnachTreeExist(struct Tree* root, int k) //Существует ли значение
-{
+bool ifZnachTreeExist(struct Tree* root, int k) {//Существует ли значение
     if (root == nullptr) return false;
     if (root->value == k) return true;
     if (ifZnachTreeExist(root->left, k)) return true;
     if (ifZnachTreeExist(root->right, k)) return true;
     return false;
 }
-Tree* CreateRoot(int k) //Создание корня
-{
+Tree* CreateRoot(int k) {//Создание корня
     Tree* root = new Tree;
     root->color = BLACK;
     root->value = k;
@@ -75,8 +72,7 @@ Tree* rotateRight(Tree*& root, Tree* y) {//Правый поворот
     y->parent = x;
     return x;
 }
-// Балансировка после вставки
-void fixInsert(Tree*& root, Tree* ptr) {
+void fixInsert(Tree*& root, Tree* ptr) {// Балансировка после вставки
     while (ptr != root && ptr->parent != nullptr && ptr->parent->color == RED) {
         Tree* parent = ptr->parent;
         Tree* grandpa = parent->parent;
@@ -128,8 +124,7 @@ Tree* AddLeaf(Tree*& root, int k) { //Добавление узла
         root = element;
         return root;
     }
-    // Поиск места вставки
-    Tree* peremElem = root;
+    Tree* peremElem = root;// Поиск места вставки
     Tree* parent = nullptr;
     while (peremElem != nullptr) {
         parent = peremElem;
@@ -142,21 +137,18 @@ Tree* AddLeaf(Tree*& root, int k) { //Добавление узла
     fixInsert(root, element);
     return root;
 }
-// Поиск узла по значению
-Tree* findPlace(Tree* root, int k) {
+Tree* findPlace(Tree* root, int k) {// Поиск узла по значению
     if (root == nullptr || root->value == k) return root;
     if (k < root->value)return findPlace(root->left, k);
     else return findPlace(root->right, k);
 }
-// Поиск минимального узла в поддереве
-Tree* findMinimum(Tree* node) {
+Tree* findMinimum(Tree* node) {// Поиск минимального узла в поддереве
     while (node->left != nullptr) {
         node = node->left;
     }
     return node;
 }
-// Функция для трансплантации одного узла на место другого
-void transplant(Tree*& root, Tree* u, Tree* v) {
+void transplant(Tree*& root, Tree* u, Tree* v) {// Функция для трансплантации одного узла на место другого
     if (u->parent == nullptr) {
         root = v;
     }
@@ -170,31 +162,26 @@ void transplant(Tree*& root, Tree* u, Tree* v) {
         v->parent = u->parent;
     }
 }
-// Балансировка после удаления
-void fixDelete(Tree*& root, Tree* x, Tree* parent) {
+void fixDelete(Tree*& root, Tree* x, Tree* parent) {// Балансировка после удаления
     while (x != root && (x == nullptr || x->color == BLACK)) {
         if (parent == nullptr) break;
         if (x == parent->left) { //Левый ребенок
             Tree* sibling = parent->right;
             if (sibling == nullptr) break;
-            // Случай 1: брат красный
-            if (sibling->color == RED) {
+            if (sibling->color == RED) { // Случай 1: брат красный
                 sibling->color = BLACK;
                 parent->color = RED;
                 rotateLeft(root, parent);
                 sibling = parent->right;
                 if (sibling == nullptr) break;
             }
-            // Случай 2: оба ребенка брата черные
-            if ((sibling->left == nullptr || sibling->left->color == BLACK) &&
-                (sibling->right == nullptr || sibling->right->color == BLACK)) {
+            if ((sibling->left == nullptr || sibling->left->color == BLACK) &&(sibling->right == nullptr || sibling->right->color == BLACK)) {// Случай 2: оба ребенка брата черные
                 sibling->color = RED;
                 x = parent;
                 parent = x->parent;
             }
             else {
-                // Случай 3: правый ребенок брата черный
-                if (sibling->right == nullptr || sibling->right->color == BLACK) {
+                if (sibling->right == nullptr || sibling->right->color == BLACK) {// Случай 3: правый ребенок брата черный
                     if (sibling->left != nullptr) {
                         sibling->left->color = BLACK;
                     }
@@ -203,8 +190,7 @@ void fixDelete(Tree*& root, Tree* x, Tree* parent) {
                     sibling = parent->right;
                     if (sibling == nullptr) break;
                 }
-                // Случай 4: правый ребенок брата красный
-                sibling->color = parent->color;
+                sibling->color = parent->color;// Случай 4: правый ребенок брата красный
                 parent->color = BLACK;
                 if (sibling->right != nullptr) {
                     sibling->right->color = BLACK;
@@ -215,8 +201,7 @@ void fixDelete(Tree*& root, Tree* x, Tree* parent) {
             }
         }
         else {
-            // Правый ребенок
-            Tree* sibling = parent->left;
+            Tree* sibling = parent->left;// Правый ребенок
             if (sibling == nullptr) break;
             if (sibling->color == RED) {
                 sibling->color = BLACK;
@@ -225,8 +210,7 @@ void fixDelete(Tree*& root, Tree* x, Tree* parent) {
                 sibling = parent->left;
                 if (sibling == nullptr) break;
             }
-            if ((sibling->right == nullptr || sibling->right->color == BLACK) &&
-                (sibling->left == nullptr || sibling->left->color == BLACK)) {
+            if ((sibling->right == nullptr || sibling->right->color == BLACK) &&(sibling->left == nullptr || sibling->left->color == BLACK)) {
                 sibling->color = RED;
                 x = parent;
                 parent = x->parent;
@@ -256,23 +240,16 @@ void fixDelete(Tree*& root, Tree* x, Tree* parent) {
         x->color = BLACK;
     }
 }
-
 Tree* findMax(Tree* node) {
     while (node->right != nullptr) {
         node = node->right;
     }
     return node;
 }
-// Удаление узла без детей
 bool deleteLeaf(Tree*& root, int k) {
     Tree* z = findPlace(root, k);
     if (z == nullptr) {
         cout << "Узел со значением " << k << " не найден!" << endl;
-        return false;
-    }
-    // Проверка, что узел без детей
-    if (z->left != nullptr || z->right != nullptr) {
-        cout << "Узел " << k << " имеет детей! Удаление невозможно." << endl;
         return false;
     }
     Tree* y = z;
@@ -292,15 +269,13 @@ bool deleteLeaf(Tree*& root, int k) {
     delete z;
     return true;
 }
-// Удаление узла с одним ребенком
 bool deleteNodeWithOneChild(Tree*& root, int k) {
     Tree* z = findPlace(root, k);
     if (z == nullptr) {
         cout << "Узел со значением " << k << " не найден!" << endl;
         return false;
     }
-    if ((z->left == nullptr && z->right == nullptr) ||
-        (z->left != nullptr && z->right != nullptr)) {
+    if ((z->left == nullptr && z->right == nullptr) ||(z->left != nullptr && z->right != nullptr)) {
         cout << "Узел " << k << " имеет не одного ребенка! Удаление невозможно." << endl;
         return false;
     }
@@ -320,30 +295,18 @@ bool deleteNodeWithOneChild(Tree*& root, int k) {
     delete z;
     return true;
 }
-// Удаление узла с двумя детьми
 bool deleteNodeWithTwoChildren(Tree*& root, int k) {
     Tree* z = findPlace(root, k);
     if (z == nullptr) {
         cout << "Узел со значением " << k << " не найден!" << endl;
         return false;
     }
-    // Проверка, что узел имеет двух детей
-    if (z->left == nullptr || z->right == nullptr) {
-        cout << "Узел " << k << " имеет не двух детей! Удаление невозможно." << endl;
-        return false;
-    }
-    // Находим максимальный элемент в левом поддереве (самый правый в левой ветке)
     Tree* successor = findMax(z->left);
-    // Сохраняем оригинальные цвета
     Color z_original_color = z->color;
     Color successor_original_color = successor->color;
-    // Меняем только значения, сохраняя цвета
     int temp_value = z->value;
     z->value = successor->value;
     successor->value = temp_value;
-    // Теперь удаляем successor из его нового места
-    // successor всегда будет иметь не более одного правого ребенка
-    // (так как это максимальный элемент в левом поддереве)
     Tree* y = successor;
     Tree* x = nullptr;
     if (successor->left == nullptr) {
@@ -359,49 +322,41 @@ bool deleteNodeWithTwoChildren(Tree*& root, int k) {
     delete successor;
     return true;
 }
-// Универсальная функция удаления любого узла
-bool deleteNode(Tree*& root, int k) {
+bool deleteNode(Tree*& root, int k) {// Универсальная функция удаления любого узла
     Tree* z = findPlace(root, k);
     if (z == nullptr) {
         cout << "Узел со значением " << k << " не найден!" << endl;
         return false;
     }
-    // Определяем тип узла и вызываем соответствующую функцию
-    if (z->left == nullptr && z->right == nullptr) {
+    if (z->left == nullptr && z->right == nullptr) {// Определяем тип узла и вызываем соответствующую функцию
         return deleteLeaf(root, k);
     }
-    else if ((z->left != nullptr && z->right == nullptr) ||
-        (z->left == nullptr && z->right != nullptr)) {
+    else if ((z->left != nullptr && z->right == nullptr) ||(z->left == nullptr && z->right != nullptr)) {
         return deleteNodeWithOneChild(root, k);
     }
     else {
         return deleteNodeWithTwoChildren(root, k); // Добавьте эту строку
     }
-
 }
-// Обход симметричный
-void symmetrical(Tree* root) {
+void symmetrical(Tree* root) {// Обход симметричный
     if (root == nullptr) return;
     symmetrical(root->left);
     cout << root->value << (root->color == RED ? "r" : "b") << " ";
     symmetrical(root->right);
 }
-// Обход сверху вниз
-void fromTopToBottom(Tree* root) {
+void fromTopToBottom(Tree* root) {// Обход сверху вниз
     if (root == nullptr) return;
     cout << root->value << (root->color == RED ? "r" : "b") << " ";
     fromTopToBottom(root->left);
     fromTopToBottom(root->right);
 }
-// Обход снизу вверх
-void fromBottomToTop(Tree* root) {
+void fromBottomToTop(Tree* root) {// Обход снизу вверх
     if (root == nullptr) return;
     fromBottomToTop(root->left);
     fromBottomToTop(root->right);
     cout << root->value << (root->color == RED ? "r" : "b") << " ";
 }
-// Вспомогательная функция для рекурсивного BFS
-void BFSRecursiveHelper(Tree* root, int level) {
+void BFSRecursiveHelper(Tree* root, int level) {// для рекурсивного BFS
     if (root == nullptr) return;
     if (level == 1) {
         cout << root->value << (root->color == RED ? "r" : "b") << " ";
@@ -428,26 +383,3 @@ void BFS(Tree* root) {
     }
     cout << endl;
 }
-/*
-int main()
-{
-    Tree* MyTree = nullptr;
-    MyTree = AddLeaf(MyTree, 15);
-    MyTree = AddLeaf(MyTree, 7);
-    MyTree = AddLeaf(MyTree, 11);
-    MyTree = AddLeaf(MyTree, 13);
-    MyTree = AddLeaf(MyTree, 9);
-    MyTree = AddLeaf(MyTree, 19);
-    MyTree = AddLeaf(MyTree, 1);
-    MyTree = AddLeaf(MyTree, 4);
-    MyTree = AddLeaf(MyTree, 10);
-    MyTree = AddLeaf(MyTree, 8);
-    deleteNodeWithTwoChildren(MyTree, 7);
-    deleteNodeWithTwoChildren(MyTree, 9);
-    deleteLeaf(MyTree, 1);
-    deleteNodeWithTwoChildren(MyTree, 8);
-    deleteNodeWithTwoChildren(MyTree, 11);
-    deleteNodeWithTwoChildren(MyTree, 15);
-    BFS(MyTree);
-}
-*/
