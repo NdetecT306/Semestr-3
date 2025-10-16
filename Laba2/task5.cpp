@@ -403,18 +403,13 @@ bool deleteNodeWithTwoChildren(Tree*& root, int k) {
         cout << "Узел " << k << " имеет не двух детей! Удаление невозможно." << endl;
         return false;
     }
-    // Находим максимальный элемент в левом поддереве (самый правый в левой ветке)
     Tree* successor = findMax(z->left);
     // Сохраняем оригинальные цвета
     Color z_original_color = z->color;
     Color successor_original_color = successor->color;
-    // Меняем только значения, сохраняя цвета
     int temp_value = z->value;
     z->value = successor->value;
     successor->value = temp_value;
-    // Теперь удаляем successor из его нового места
-    // successor всегда будет иметь не более одного правого ребенка
-    // (так как это максимальный элемент в левом поддереве)
     Tree* y = successor;
     Tree* x = nullptr;
     if (successor->left == nullptr) {
@@ -437,7 +432,6 @@ bool deleteNode(Tree*& root, int k) {
         cout << "Узел со значением " << k << " не найден!" << endl;
         return false;
     }
-    // Определяем тип узла и вызываем соответствующую функцию
     if (z->left == nullptr && z->right == nullptr) {
         return deleteLeaf(root, k);
     }
@@ -446,7 +440,7 @@ bool deleteNode(Tree*& root, int k) {
         return deleteNodeWithOneChild(root, k);
     }
     else {
-        return deleteNodeWithTwoChildren(root, k); // Добавьте эту строку
+        return deleteNodeWithTwoChildren(root, k);
     }
 
 }
@@ -502,10 +496,8 @@ void BFS(Tree* root) {
 // Функция для вычисления глубины узла в готовом дереве
 int getNodeDepth(Tree* root, Tree* node) {
     if (root == nullptr || node == nullptr) return 0;
-
     int depth = 0;
     Tree* current = root;
-
     while (current != nullptr && current != node) {
         if (node->value < current->value) {
             current = current->left;
@@ -515,15 +507,10 @@ int getNodeDepth(Tree* root, Tree* node) {
         }
         depth++;
     }
-
-    return depth + 1; // +1 потому что глубина включает и сам элемент
+    return depth + 1; 
 }
-
-// Функция для сбора всех уникальных значений из дерева
 void collectUniqueValues(Tree* root, Massiv& values) {
     if (root == nullptr) return;
-
-    // Проверяем, нет ли уже этого значения в массиве
     bool exists = false;
     for (int i = 0; i < values.size; i++) {
         if (getMasPoInd(values, i) == root->value) {
@@ -531,42 +518,30 @@ void collectUniqueValues(Tree* root, Massiv& values) {
             break;
         }
     }
-
-    // Если значения нет в массиве, добавляем его
     if (!exists) {
         addMasAtEnd(values, root->value);
     }
-
     collectUniqueValues(root->left, values);
     collectUniqueValues(root->right, values);
 }
-
-// Основная функция для обработки ввода и вывода глубин
 void processInputWithDepths() {
     Tree* root = nullptr;
     int n;
-    // Запрашиваем количество элементов
     cout << "Сколько элементов будет введено? ";
     cin >> n;
     if (n <= 0) {
         cout << "Неверное количество элементов!" << endl;
         return;
     }
-
-    // Используем структуру Massiv вместо обычного массива
     Massiv inputValues;
     createMas(inputValues, n);
-
-    int uniqueCount = 0; // Счетчик уникальных элементов
+    int uniqueCount = 0; 
     cout << "Введите " << n << " элементов: ";
     for (int i = 0; i < n; i++) {
         int value;
         cin >> value;
         addMasAtEnd(inputValues, value);
-
-        // Проверяем, существует ли элемент в дереве
         if (!ifZnachTreeExist(root, value)) {
-            // Добавляем элемент в дерево
             if (root == nullptr) {
                 root = CreateRoot(value);
             }
@@ -576,21 +551,15 @@ void processInputWithDepths() {
             uniqueCount++;
         }
     }
-
-    // Теперь, когда дерево полностью построено, вычисляем глубины
     Massiv depths;
     createMas(depths, uniqueCount);
-
-    // Для каждого введенного значения находим его глубину в готовом дереве
     for (int i = 0; i < RazmerMas(inputValues); i++) {
         int value = getMasPoInd(inputValues, i);
         Tree* node = findPlace(root, value);
         if (node != nullptr) {
-            // Проверяем, не вычисляли ли мы уже глубину для этого значения
             bool alreadyCalculated = false;
             for (int j = 0; j < RazmerMas(depths); j++) {
                 if (getMasPoInd(depths, j) == getNodeDepth(root, node)) {
-                    // Ищем соответствующее значение в inputValues чтобы убедиться
                     Tree* existingNode = findPlace(root, getMasPoInd(inputValues, j));
                     if (existingNode != nullptr && existingNode->value == node->value) {
                         alreadyCalculated = true;
@@ -603,7 +572,6 @@ void processInputWithDepths() {
             }
         }
     }
-    // Выводим глубины добавленных элементов
     cout << "Глубины добавленных элементов: ";
     for (int i = 0; i < RazmerMas(depths); i++) {
         cout << getMasPoInd(depths, i);
@@ -612,7 +580,6 @@ void processInputWithDepths() {
         }
     }
     cout << endl;
-    // Освобождаем память
     freeMas(inputValues);
     freeMas(depths);
 }
