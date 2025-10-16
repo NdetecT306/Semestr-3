@@ -95,13 +95,11 @@ struct cuckooHASH {
     int key;
     string value;
     bool isDeleted;
-    bool isEmpty; // Добавляем явный признак пустой ячейки
+    bool isEmpty; 
 };
 const int N = 10;
 const int MAX_ITERATIONS = 10;
 cuckooHASH cuckooTable[N];
-
-// Инициализация таблицы
 void initCuckooTable() {
     for (int i = 0; i < N; i++) {
         cuckooTable[i].key = 0;
