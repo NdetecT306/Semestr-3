@@ -19,7 +19,7 @@ void addMasAtEnd(Massiv& A, int znach) { // Добавить в конец
     A.num[A.size] = znach;
     A.size++;
 }
-void readMas(const Massiv& A) { // Чтение
+void readMas(const Massiv& A) { 
     if (A.size == 0) {
         cout << "Массив пустой, Ваша честь." << endl;
         return;
