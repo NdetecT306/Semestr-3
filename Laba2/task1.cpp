@@ -1,5 +1,6 @@
 // ЗАДАНИЕ 1
 #include <iostream>
+#include <string>
 using namespace std;
 enum DIR { Right, Left };
 struct Pair
@@ -7,147 +8,152 @@ struct Pair
     int* num;
     DIR direction;
 };
-struct Massiv
-{
-    Pair* asteroid;
-    int size;
-    int C;
+struct STACK {
+    Pair asteroid;  
+    STACK* point;   
 };
-void createMas(Massiv& A, int C) { //Создать массив
-    A.asteroid = new Pair[C];
-    A.size = 0; // изначально элементов нет
-    A.C = C;
-}
 Pair AddPair(int znach, DIR dir) {
     Pair newPair;
     newPair.num = new int(znach);
     newPair.direction = dir;
     return newPair;
 }
-void addMasAtEnd(Massiv& A, int znach, DIR dir) { //Добавить в конец
-    if (A.size >= A.C) {
-        cout << "Массив заполнен." << endl;
-        return;
-    }
-    A.asteroid[A.size] = AddPair(znach, dir);
-    A.size++;
+void addStack(STACK*& ptr, int size, DIR direction) { 
+    STACK* element = new STACK;
+    element->asteroid = AddPair(size, direction);  
+    element->point = ptr; 
+    ptr = element;        
 }
-void poiskMasPoInd(Massiv& A, int ind) { //Получение по индексу
-    if (ind < 0 || ind >= A.size) {
-        cout << "Выход за границы массива." << endl;
-        return;
-    }
-    else {
-        cout << *A.asteroid[ind].num  << A.asteroid[ind].direction << endl;
+void deleteStack(STACK*& ptr) { 
+    if (ptr != nullptr) {
+        STACK* element = ptr;
+        ptr = ptr->point; 
+        delete element->asteroid.num;  
+        delete element;     
     }
 }
-void deleteMasPoInd(Massiv& A, int ind) { //Удалить по индексу
-    if (ind < 0 || ind >= A.size) {
-        cout << "Элемента за границами массива быть не может." << endl;
+void readStack(STACK* ptr) {
+    if (ptr == nullptr) {
         return;
     }
-    else {
-        delete A.asteroid[ind].num;
-        for (int i = ind; i < A.size - 1; i++) {
-            A.asteroid[i] = A.asteroid[i + 1];
-        }
-        A.size--;
+    readStack(ptr->point);
+    cout << *ptr->asteroid.num << " ";
+    if (ptr->asteroid.direction == Right) {
+        cout << "right" << endl;
+    } else {
+        cout << "left" << endl;
     }
 }
-void ZamenaMas(Massiv& A, int ind, int znach, DIR dir) { 
-    if (ind < 0 || ind >= A.size) {
-        cout << "Нельзя заменить то что не существует." << endl;
-        return;
+void Transformation(STACK*& A) {
+    if (A == nullptr || A->point == nullptr) return;
+    STACK* element = nullptr;
+    STACK* current = A;
+    while (current != nullptr) {
+        addStack(element, *current->asteroid.num, current->asteroid.direction);
+        current = current->point;
     }
-    else {
-        delete A.asteroid[ind].num;
-        A.asteroid[ind].num = new int(znach);
-        A.asteroid[ind].direction = dir;
-    }
-}
-void readMas(Massiv& A) { //Чтение
-    if (A.size == 0) {
-        cout << "Массив пустой, Ваша честь.";
-        return;
-    }
-    for (int i = 0; i < A.size; i++){
-        cout << *A.asteroid[i].num << " ";
-        if (A.asteroid[i].direction == Right) {
-            cout << "right";
-        }
-        else {
-            cout << "left";
-        }
-        cout << endl;
-    }
-    cout << endl;
-}
-void Transformation(Massiv& A) { //Все столкновения астероидов
-    bool crash;
+    bool move;
     do {
-        crash = false;
-        int i = 0;
-        while (i < A.size - 1) {
-            if (A.asteroid[i].direction != A.asteroid[i + 1].direction) {
-                crash = true;
-                if (*A.asteroid[i].num > *A.asteroid[i + 1].num) {
-                    int newSize = *A.asteroid[i].num - *A.asteroid[i + 1].num;
-                    ZamenaMas(A, i, newSize, A.asteroid[i].direction);
-                    deleteMasPoInd(A, i + 1); 
+        move = false;
+        STACK* now = element;
+        STACK* prev = nullptr;
+        while (now != nullptr && now->point != nullptr) {
+            STACK* next = now->point;
+            if (now->asteroid.direction == Right && next->asteroid.direction == Left) {
+                move = true;
+                if (*now->asteroid.num > *next->asteroid.num) {
+                    *now->asteroid.num = *now->asteroid.num - *next->asteroid.num;
+                    now->point = next->point;
+                    delete next->asteroid.num;
+                    delete next;
                 }
-                else if (*A.asteroid[i].num < *A.asteroid[i + 1].num) {
-                    int newSize = *A.asteroid[i + 1].num - *A.asteroid[i].num;
-                    ZamenaMas(A, i + 1, newSize, A.asteroid[i+1].direction);
-                    deleteMasPoInd(A, i);
+                else if (*now->asteroid.num < *next->asteroid.num) {
+                    *next->asteroid.num = *next->asteroid.num - *now->asteroid.num;
+                    if (prev == nullptr) {
+                        element = next;
+                        delete now->asteroid.num;
+                        delete now;
+                        now = element;
+                    } else {
+                        prev->point = next;
+                        delete now->asteroid.num;
+                        delete now;
+                        now = next;
+                    }
                 }
                 else {
-                    deleteMasPoInd(A, i + 1);
-                    deleteMasPoInd(A, i);
+                    if (prev == nullptr) {
+                        element = next->point;
+                        delete now->asteroid.num;
+                        delete now;
+                        delete next->asteroid.num;
+                        delete next;
+                        now = element;
+                    } else {
+                        prev->point = next->point;
+                        delete now->asteroid.num;
+                        delete now;
+                        delete next->asteroid.num;
+                        delete next;
+                        now = prev->point;
+                    }
                 }
+                break; 
             }
             else {
-                i++; 
+                prev = now;
+                now = now->point;
             }
         }
-    } while (crash && A.size > 1);
+    } while (move && element != nullptr && element->point != nullptr);
+    while (A != nullptr) {
+        deleteStack(A);
+    }
+    current = element;
+    while (current != nullptr) {
+        addStack(A, *current->asteroid.num, current->asteroid.direction);
+        current = current->point;
+    }
 }
 int main()
 {
     setlocale(LC_ALL, "rus");
-    Massiv OurMassiv;
+    STACK* OurStack = nullptr;  
     cout << "Введите количество астероидов: ";
-    int carasity;
-    cin >> carasity;
-    if (carasity <= 0) {
+    int capacity;
+    cin >> capacity;
+    if (capacity <= 0) {
         cout << "Невозможное количество астероидов. Прекращаем работу.";
         return 0;
     }
-    createMas(OurMassiv, carasity);
     cout << "Введите все астероиды и их направления (right или left)." << endl;
-    int size;
-    string dir;
-    for (int i = 0; i < carasity; i++){
+    for (int i = 0; i < capacity; i++){
+        int size;
+        string dir;
         int num = i + 1;
-        cout << "Размер астероида " << num <<": ";
+        cout << "Размер астероида " << num << ": ";
         cin >> size;
         cout << "Направление астероида " << num << ": ";
         cin >> dir;
         DIR direction;
-        if (dir == "right" || dir == "Right") {
+        if (dir == "right" || dir == "Right" || dir == "r") {
             direction = Right;
         }
-        else if (dir == "left" || dir == "Left") {
+        else if (dir == "left" || dir == "Left" || dir == "l") {
             direction = Left;
         }
         else {
             cout << "Неверное направление! Прекращаю работу." << endl;
             return 0;
         }
-        addMasAtEnd(OurMassiv, size, direction);
+        addStack(OurStack, size, direction);
     }
     cout << "Ваш введенный массив: " << endl;
-    readMas(OurMassiv);
-    Transformation(OurMassiv);
+    readStack(OurStack);
+    cout << endl;
+    Transformation(OurStack);
     cout << "После изменений: " << endl;
-    readMas(OurMassiv);
+    readStack(OurStack);
+    cout << endl;
+    return 0;
 }
