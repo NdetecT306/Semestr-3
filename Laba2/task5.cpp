@@ -4,6 +4,12 @@
 using namespace std;
 const int HASH_SIZE = 256;
 const int MAX_SYMBOLS = 256;
+// Структура массива 
+struct Numbers {
+    string* num;
+    int size;
+    int C;
+};
 struct Huffman {
     string symbols;
     int weight;
@@ -22,6 +28,57 @@ struct CodeTable {
     char symbol;
     string code;
 };
+void createMas(Numbers& A, int C) {
+    A.num = new string[C];
+    A.size = 0;
+    A.C = C;
+}
+void addMasAtEnd(Numbers& A, string znach) {
+    if (A.size >= A.C) {
+        cout << "Массив заполнен." << endl;
+        return;
+    }
+    A.num[A.size] = znach;
+    A.size++;
+}
+void readMas(Numbers& A) {
+    if (A.size == 0) {
+        cout << "Массив пустой." << endl;
+        return;
+    }
+    for (int i = 0; i < A.size; i++) {
+        cout << A.num[i] << " ";
+    }
+    cout << endl;
+}
+int getSymbolHeight(Huffman* node, char symbol, int currentHeight = 1) {
+    if (!node) return 0;
+    if (node->symbols.length() == 1) {
+        if (node->symbols[0] == symbol) {
+            return currentHeight;
+        }
+        return 0;
+    }
+    int leftHeight = getSymbolHeight(node->left, symbol, currentHeight + 1);
+    if (leftHeight > 0) return leftHeight;
+    int rightHeight = getSymbolHeight(node->right, symbol, currentHeight + 1);
+    return rightHeight;
+}
+void getSymbolHeightsInOrder(Huffman* root, const string& input, Numbers& heights) { //Высоты по мере добавления
+    bool visited[256] = {false}; // Для отслеживания уже посещенных символов
+    for (char c : input) {
+        if (!visited[static_cast<unsigned char>(c)]) {
+            int height = getSymbolHeight(root, c);
+            if (height > 0) {
+                string heightInfo = "'";
+                heightInfo += c;
+                heightInfo += "': высота = " + to_string(height);
+                addMasAtEnd(heights, heightInfo);
+                visited[static_cast<unsigned char>(c)] = true;
+            }
+        }
+    }
+}
 int hash1(int key) {
     return key % HASH_SIZE;
 }
@@ -86,7 +143,7 @@ bool HASH_GET(DOUBLE_HASH* hashTable, char key, int& result) {
     }
     return false;
 }
-DOUBLE_HASH* Chastota(const string& text) {
+DOUBLE_HASH* Chastota(const string& text) { //Считаем частоту  
     DOUBLE_HASH* frequencies = createHashTable();
     for (char c : text) {
         int currentValue;
@@ -98,8 +155,7 @@ DOUBLE_HASH* Chastota(const string& text) {
     }
     return frequencies;
 }
-// Получение количества элементов в хэш-таблице
-int getHashTableSize(DOUBLE_HASH* hashTable) {
+int getHashTableSize(DOUBLE_HASH* hashTable) { //Читаем таблицу
     int count = 0;
     for (int i = 0; i < HASH_SIZE; i++) {
         if (!hashTable[i].isEmpty && !hashTable[i].isDeleted) {
@@ -116,7 +172,7 @@ void getHashTableEntries(DOUBLE_HASH* hashTable, Huffman** nodes, int& count) {
         }
     }
 }
-void sortNodes(Huffman** nodes, int size) { //Сортировка
+void sortNodes(Huffman** nodes, int size) { //Сортировка по частоте
     for (int i = 0; i < size - 1; i++) {
         for (int j = 0; j < size - i - 1; j++) {
             if (nodes[j]->weight < nodes[j + 1]->weight || 
@@ -128,12 +184,11 @@ void sortNodes(Huffman** nodes, int size) { //Сортировка
         }
     }
 }
-void findTwoSmallest(Huffman** nodes, int size, int& idx1, int& idx2) {// Поиск двух узлов с наименьшим весом
+void findTwoSmallest(Huffman** nodes, int size, int& idx1, int& idx2) { //Поиск самых худых
     idx1 = -1;
     idx2 = -1;
     for (int i = 0; i < size; i++) {
         if (nodes[i] == nullptr) continue;
-        
         if (idx1 == -1 || nodes[i]->weight < nodes[idx1]->weight) {
             idx2 = idx1;
             idx1 = i;
@@ -142,29 +197,30 @@ void findTwoSmallest(Huffman** nodes, int size, int& idx1, int& idx2) {// Пои
         }
     }
 }
+
 Huffman* build(DOUBLE_HASH* frequencies) {
     Huffman* nodes[MAX_SYMBOLS] = {nullptr};
     int nodeCount = 0;
-    getHashTableEntries(frequencies, nodes, nodeCount); //Читаем таблицу
-    sortNodes(nodes, nodeCount); //От тяжелых к легким
+    getHashTableEntries(frequencies, nodes, nodeCount);
+    sortNodes(nodes, nodeCount);
     cout << "Начальные узлы (отсортированные по убыванию частоты):" << endl;
     for (int i = 0; i < nodeCount; i++) {
         cout << "'" << nodes[i]->symbols << "': " << nodes[i]->weight << endl;
     }
     cout << endl;
-    while (nodeCount > 1) { //Построим дерево         
-        Huffman* node1 = nodes[nodeCount - 1]; //Берем 2 самых легких узла
+    while (nodeCount > 1) {
+        Huffman* node1 = nodes[nodeCount - 1];
         Huffman* node2 = nodes[nodeCount - 2];
-        string combinedSymbols = node1->symbols + node2->symbols; //Обьединяем их браком (в один элемент) и считаем их вес
+        string combinedSymbols = node1->symbols + node2->symbols;
         int combinedWeight = node1->weight + node2->weight;
-        Huffman* parent = new Huffman(combinedSymbols, combinedWeight, node1, node2); //Добавляем в реестр семью
+        Huffman* parent = new Huffman(combinedSymbols, combinedWeight, node1, node2);
         nodes[nodeCount - 2] = parent;
         nodeCount--;
         sortNodes(nodes, nodeCount);
     }
     return nodes[0];
 }
-void generateCodes(Huffman* node, const string& code, CodeTable* codes, int& codeCount) {// Генерация кодов Хаффмана
+void generateCodes(Huffman* node, const string& code, CodeTable* codes, int& codeCount) {
     if (!node) return;
     if (node->symbols.length() == 1) {
         codes[codeCount].symbol = node->symbols[0];
@@ -175,7 +231,7 @@ void generateCodes(Huffman* node, const string& code, CodeTable* codes, int& cod
     generateCodes(node->left, code + "0", codes, codeCount);
     generateCodes(node->right, code + "1", codes, codeCount);
 }
-string findCode(CodeTable* codes, int codeCount, char symbol) { //Поиск
+string findCode(CodeTable* codes, int codeCount, char symbol) { //Поиск символа
     for (int i = 0; i < codeCount; i++) {
         if (codes[i].symbol == symbol) {
             return codes[i].code;
@@ -183,13 +239,11 @@ string findCode(CodeTable* codes, int codeCount, char symbol) { //Поиск
     }
     return "";
 }
-string encode(const string& text, CodeTable* codes, int codeCount) { //Кодировка
+string encode(const string& text, CodeTable* codes, int codeCount) {//Кодировка
     string encoded = "";
-    
     for (char c : text) {
         encoded += findCode(codes, codeCount, c);
     }
-    
     return encoded;
 }
 string decode(const string& encoded, Huffman* root) { //Декодировка
@@ -208,8 +262,7 @@ string decode(const string& encoded, Huffman* root) { //Декодировка
     }
     return decoded;
 }
-// Вывод дерева
-void printTree(Huffman* node, const string& prefix = "", bool isLeft = true) {
+void printTree(Huffman* node, const string& prefix = "", bool isLeft = true) { //Печатаем дерево
     if (!node) return;
     if (node->right) {
         printTree(node->right, prefix + (isLeft ? "│   " : "    "), false);
@@ -221,7 +274,6 @@ void printTree(Huffman* node, const string& prefix = "", bool isLeft = true) {
     } else {
         cout << "[" << node->symbols << "] (" << node->weight << ")" << endl;
     }
-    
     if (node->left) {
         printTree(node->left, prefix + (isLeft ? "    " : "│   "), true);
     }
@@ -242,11 +294,13 @@ int main() {
     }
     cout << "\nДерево Хаффмана:" << endl;
     printTree(root);
+    cout << "\nВысота дерева для каждого уникального символа в порядке добавления:" << endl;
+    Numbers heights;
+    createMas(heights, MAX_SYMBOLS); // Создаем массив для хранения высот
+    getSymbolHeightsInOrder(root, input, heights);
+    readMas(heights);
     string encoded = encode(input, codes, codeCount);
     cout << "\nЗакодированная строка: " << encoded << endl;
-    int originalBits = input.length() * 8;
-    int encodedBits = encoded.length();
-    double compressionRatio = (1.0 - (double)encodedBits / originalBits) * 100.0;
     string decoded = decode(encoded, root);
     cout << "Декодированная строка: " << decoded << endl;
     return 0;
