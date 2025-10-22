@@ -7,12 +7,11 @@
 using namespace std;
 const int HASH_SIZE = 256;
 struct DOUBLE_HASH {
-    int key;
-    int value;
+    string value;
     bool isDeleted;
     bool isEmpty;
 };
-map<string, DOUBLE_HASH*> hashes;
+map<string, DOUBLE_HASH*> sets;
 int hash1(int key) {
     return key % HASH_SIZE;
 }
@@ -22,32 +21,31 @@ int hash2(int key) {
 DOUBLE_HASH* createHashTable() {
     DOUBLE_HASH* newHash = new DOUBLE_HASH[HASH_SIZE];
     for (int i = 0; i < HASH_SIZE; i++) {
-        newHash[i].key = -1;
-        newHash[i].value = -1;
+        newHash[i].value = "";
         newHash[i].isDeleted = false;
         newHash[i].isEmpty = true;
     }
     return newHash;
 }
-bool SETADD(const string& setName, int value) {
-    if (hashes.find(setName) == hashes.end()) {
-        hashes[setName] = createHashTable();
+bool SETADD(const string& setName, const string& value) {
+    if (sets.find(setName) == sets.end()) {
+        sets[setName] = createHashTable();
     }
-    DOUBLE_HASH* currentHash = hashes[setName];
-    int index = hash1(value);
-    int step = hash2(value);
+    DOUBLE_HASH* currentSet = sets[setName];
+    int key = 1; 
+    int index = hash1(key);
+    int step = hash2(key);
     int startIndex = index;
     int attempts = 0;
     while (attempts < HASH_SIZE) {
-        if (currentHash[index].isEmpty || currentHash[index].isDeleted) {
-            currentHash[index].key = value;
-            currentHash[index].value = value;
-            currentHash[index].isDeleted = false;
-            currentHash[index].isEmpty = false;
+        if (currentSet[index].isEmpty || currentSet[index].isDeleted) {
+            currentSet[index].value = value;
+            currentSet[index].isDeleted = false;
+            currentSet[index].isEmpty = false;
             return true;
         }
-        if (currentHash[index].key == value && !currentHash[index].isDeleted) {
-            return true; // Элемент уже существует
+        if (currentSet[index].value == value && !currentSet[index].isDeleted) {
+            return false; 
         }
         index = (index + step) % HASH_SIZE;
         attempts++;
@@ -57,22 +55,23 @@ bool SETADD(const string& setName, int value) {
     }
     return false;
 }
-bool SETDEL(const string& setName, int value) {
-    if (hashes.find(setName) == hashes.end()) {
+bool SETDEL(const string& setName, const string& value) {
+    if (sets.find(setName) == sets.end()) {
         return false;
     }
-    DOUBLE_HASH* currentHash = hashes[setName];
-    int index = hash1(value);
-    int step = hash2(value);
+    DOUBLE_HASH* currentSet = sets[setName];
+    int key = 1; 
+    int index = hash1(key);
+    int step = hash2(key);
     int startIndex = index;
     int attempts = 0;
     while (attempts < HASH_SIZE) {
-        if (currentHash[index].isEmpty && !currentHash[index].isDeleted) {
+        if (currentSet[index].isEmpty && !currentSet[index].isDeleted) {
             return false;
         }
-        if (currentHash[index].key == value && !currentHash[index].isDeleted) {
-            currentHash[index].isDeleted = true;
-            currentHash[index].isEmpty = true;
+        if (currentSet[index].value == value && !currentSet[index].isDeleted) {
+            currentSet[index].isDeleted = true;
+            currentSet[index].isEmpty = true;
             return true;
         }
         index = (index + step) % HASH_SIZE;
@@ -83,20 +82,21 @@ bool SETDEL(const string& setName, int value) {
     }
     return false;
 }
-bool SET_AT(const string& setName, int value) {
-    if (hashes.find(setName) == hashes.end()) {
+bool SET_AT(const string& setName, const string& value) {
+    if (sets.find(setName) == sets.end()) {
         return false;
     }
-    DOUBLE_HASH* currentHash = hashes[setName];
-    int index = hash1(value);
-    int step = hash2(value);
+    DOUBLE_HASH* currentSet = sets[setName];
+    int key = 1; 
+    int index = hash1(key);
+    int step = hash2(key);
     int startIndex = index;
     int attempts = 0;
     while (attempts < HASH_SIZE) {
-        if (currentHash[index].isEmpty && !currentHash[index].isDeleted) {
+        if (currentSet[index].isEmpty && !currentSet[index].isDeleted) {
             return false;
         }
-        if (currentHash[index].key == value && !currentHash[index].isDeleted) {
+        if (currentSet[index].value == value && !currentSet[index].isDeleted) {
             return true;
         }
         index = (index + step) % HASH_SIZE;
@@ -110,16 +110,15 @@ bool SET_AT(const string& setName, int value) {
 void saveToFile(const string& filename) {
     ofstream file(filename);
     if (!file.is_open()) {
-        cerr << "Ошибка открытия файла" << endl;
         return;
     }
     file << "[SET]" << endl;
-    for (const auto& pair : hashes) {
+    for (const auto& pair : sets) {
         file << pair.first;
-        DOUBLE_HASH* currentHash = pair.second;
+        DOUBLE_HASH* currentSet = pair.second;
         for (int i = 0; i < HASH_SIZE; i++) {
-            if (!currentHash[i].isEmpty && !currentHash[i].isDeleted) {
-                file << " " << currentHash[i].key;
+            if (!currentSet[i].isEmpty && !currentSet[i].isDeleted) {
+                file << " " << currentSet[i].value; 
             }
         }
         file << endl;
@@ -131,10 +130,10 @@ void loadFromFile(const string& filename) {
     if (!file.is_open()) {
         return;
     }
-    for (auto& pair : hashes) {
+    for (auto& pair : sets) {
         delete[] pair.second;
     }
-    hashes.clear();
+    sets.clear();
     string line;
     string section;
     while (getline(file, line)) {
@@ -147,19 +146,20 @@ void loadFromFile(const string& filename) {
             istringstream iss(line);
             string setName;
             iss >> setName;
-            DOUBLE_HASH* newHash = createHashTable();
-            int value;
-            while (iss >> value) {
-                int index = hash1(value);
-                int step = hash2(value);
+            DOUBLE_HASH* newSet = createHashTable();
+            string token;
+            int key = 1; 
+            while (iss >> token) {
+                string value = token;
+                int index = hash1(key);
+                int step = hash2(key);
                 int startIndex = index;
                 int attempts = 0;
                 while (attempts < HASH_SIZE) {
-                    if (newHash[index].isEmpty || newHash[index].isDeleted) {
-                        newHash[index].key = value;
-                        newHash[index].value = value;
-                        newHash[index].isDeleted = false;
-                        newHash[index].isEmpty = false;
+                    if (newSet[index].isEmpty || newSet[index].isDeleted) {
+                        newSet[index].value = value;
+                        newSet[index].isDeleted = false;
+                        newSet[index].isEmpty = false;
                         break;
                     }
                     index = (index + step) % HASH_SIZE;
@@ -169,30 +169,55 @@ void loadFromFile(const string& filename) {
                     }
                 }
             }
-            hashes[setName] = newHash;
+            sets[setName] = newSet;
         }
     }
     file.close();
 }
-
 string processQuery(const string& query, const string& filename) {
     istringstream iss(query);
-    string operation, setName;
-    int value;
-    iss >> operation >> setName >> value;
+    string operation, setName, value;
+    iss >> operation >> setName;
     if (operation == "SETADD") {
+        string remaining;
+        getline(iss, remaining);
+        size_t firstNonSpace = remaining.find_first_not_of(' ');
+        if (firstNonSpace != string::npos) {
+            value = remaining.substr(firstNonSpace);
+        } else {
+            value = "";
+        }
+        cout << " \"" << value << "\"" << endl;
         bool result = SETADD(setName, value);
-        saveToFile(filename); 
-        return (result) ? "Добавлен" : "Уже есть";
+        saveToFile(filename);
+        return result ? "Добавлен" : "Уже есть";
     }
     else if (operation == "SETDEL") {
+        string remaining;
+        getline(iss, remaining);
+        size_t firstNonSpace = remaining.find_first_not_of(' ');
+        if (firstNonSpace != string::npos) {
+            value = remaining.substr(firstNonSpace);
+        } else {
+            value = "";
+        }
+        cout << " \"" << value << "\"" << endl;
         bool result = SETDEL(setName, value);
         saveToFile(filename);
         return result ? "Удален" : "Не найден";
     }
     else if (operation == "SET_AT") {
+        string remaining;
+        getline(iss, remaining);
+        size_t firstNonSpace = remaining.find_first_not_of(' ');
+        if (firstNonSpace != string::npos) {
+            value = remaining.substr(firstNonSpace);
+        } else {
+            value = "";
+        }
+        cout << " \"" << value << "\"" << endl;
         bool result = SET_AT(setName, value);
-        return result ? "true" : "false";
+        return result ? "есть" : "нет";
     }
     else {
         return "Неизвестная операция";
@@ -215,9 +240,9 @@ int main(int argc, char* argv[]) {
     loadFromFile(filename);
     string result = processQuery(query, filename);
     cout << "-> " << result << endl;
-    for (auto& pair : hashes) {
+    for (auto& pair : sets) {
         delete[] pair.second;
     }
-    hashes.clear();
+    sets.clear();
     return 0;
 }
