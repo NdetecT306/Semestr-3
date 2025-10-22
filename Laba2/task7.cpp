@@ -1,147 +1,129 @@
 #include <iostream>
 #include <string>
+#include <climits>
 using namespace std;
+
 const int HASH_SIZE = 256;
-const int MAX_FREQ = 1000000; 
+
 struct LFU_NODE {
     int key;
     int value;
-    int w;  
-    bool del;
-    bool emp;
+    int freq;  
+    int timestamp; 
+    bool occupied;
 };
+
 LFU_NODE hashTable[HASH_SIZE];
-int minW = 0; 
 int currentSize = 0;  
-int C = 0;     
+int capacity = 0;     
+int timeCounter = 0;
+
 int hash1(int key) {
     return key % HASH_SIZE;
 }
+
 int hash2(int key) {
     return 13 - (key % 13);
 }
+
 void CREATE(int cap) {
-    C = cap;
+    capacity = cap;
     currentSize = 0;
+    timeCounter = 0;
     for (int i = 0; i < HASH_SIZE; i++) {
         hashTable[i].key = -1;
         hashTable[i].value = -1;
-        hashTable[i].w = 0;
-        hashTable[i].del = false;
-        hashTable[i].emp = true;
+        hashTable[i].freq = 0;
+        hashTable[i].timestamp = -1;
+        hashTable[i].occupied = false;
     }
-    minW = 0;
 }
-int findLFUNode() {
+
+int findKeyIndex(int key) {
+    int ind = hash1(key);
+    int step = hash2(key);
+    for (int attempts = 0; attempts < HASH_SIZE; attempts++) {
+        if (!hashTable[ind].occupied) {
+            return -1;
+        }
+        if (hashTable[ind].occupied && hashTable[ind].key == key) {
+            return ind;
+        }
+        ind = (ind + step) % HASH_SIZE;
+    }
+    return -1;
+}
+
+int findInsertSlot(int key) {
+    int ind = hash1(key);
+    int step = hash2(key);
+    for (int attempts = 0; attempts < HASH_SIZE; attempts++) {
+        if (!hashTable[ind].occupied) {
+            return ind;
+        }
+        ind = (ind + step) % HASH_SIZE;
+    }
+    return -1;
+}
+
+int findLFUNodeToEvict() { //Смотрим на частоту посещения
     int lfuIndex = -1;
-    int minFreq = MAX_FREQ;
+    int minFreq = 0x7fffffff;
+    int oldestTime = 0x7fffffff;
     for (int i = 0; i < HASH_SIZE; i++) {
-        if (!hashTable[i].emp && !hashTable[i].del) {
-            if (hashTable[i].w < minFreq) {
-                minFreq = hashTable[i].w;
+        if (hashTable[i].occupied) {
+            if (hashTable[i].freq < minFreq) {
+                minFreq = hashTable[i].freq;
+                oldestTime = hashTable[i].timestamp;
+                lfuIndex = i;
+            } else if (hashTable[i].freq == minFreq && hashTable[i].timestamp < oldestTime) {
+                oldestTime = hashTable[i].timestamp;
                 lfuIndex = i;
             }
         }
     }
     return lfuIndex;
 }
-int findKeyIndex(int key) {
-    int ind = hash1(key);
-    int step = hash2(key);
-    for (int attempts = 0; attempts < HASH_SIZE; attempts++) {
-        if (hashTable[ind].emp && !hashTable[ind].del) {
-            return -1; 
-        }
-        if (!hashTable[ind].emp && !hashTable[ind].del &&
-            hashTable[ind].key == key) {
-            return ind; 
-        }
-        ind = (ind + step) % HASH_SIZE;
-    }
-    return -1; 
-}
-int findInsertSlot(int key) {
-    int ind = hash1(key);
-    int step = hash2(key);
-    int firstDeleted = -1;
-    for (int attempts = 0; attempts < HASH_SIZE; attempts++) {
-        if (hashTable[ind].emp && !hashTable[ind].del) {
-            return ind;
-        }
-        if (hashTable[ind].del && firstDeleted == -1) {
-            firstDeleted = ind;
-        }
-        if (!hashTable[ind].emp && !hashTable[ind].del && hashTable[ind].key == key) {
-            return ind;
-        }
 
-        ind = (ind + step) % HASH_SIZE;
-    }
-    if (firstDeleted != -1) {
-        return firstDeleted;
-    }
-    return -1; 
-}
-bool SET(int key, int value) {
+bool SET(int key, int value) { //Добавляем элемент
     int existingIndex = findKeyIndex(key);
-    if (existingIndex != -1) {
+    if (existingIndex != -1) {        // Обновляем значение при повторном обращении
         hashTable[existingIndex].value = value;
-        hashTable[existingIndex].w++;
+        hashTable[existingIndex].freq++;
+        hashTable[existingIndex].timestamp = timeCounter++;
         return true;
     }
-    if (currentSize >= C) {
-        int lfuIndex = findLFUNode();
+    if (currentSize >= capacity) {
+        int lfuIndex = findLFUNodeToEvict();
         if (lfuIndex == -1) {
-            return false; 
+            return false;
         }
-        hashTable[lfuIndex].emp = true;
-        hashTable[lfuIndex].del = true;
+        hashTable[lfuIndex].occupied = false;
         currentSize--;
     }
     int insertIndex = findInsertSlot(key);
     if (insertIndex == -1) {
-        return false; 
+        return false;
     }
     hashTable[insertIndex].key = key;
     hashTable[insertIndex].value = value;
-    hashTable[insertIndex].w = 1;
-    hashTable[insertIndex].del = false;
-    hashTable[insertIndex].emp = false;
+    hashTable[insertIndex].freq = 1;
+    hashTable[insertIndex].timestamp = timeCounter++;
+    hashTable[insertIndex].occupied = true;
     currentSize++;
-    minW = 1;
     return true;
 }
-int GET(int key) {
+
+int GET(int key) { //Выводим элемент
     int ind = findKeyIndex(key);
     if (ind == -1) {
         return -1;
     }
-    hashTable[ind].w++;
+    hashTable[ind].freq++;
+    hashTable[ind].timestamp = timeCounter++;
     return hashTable[ind].value;
 }
-bool DELETE(int key) {
-    int ind = findKeyIndex(key);
-    if (ind == -1) {
-        return false; 
-    }
-    hashTable[ind].del = true;
-    hashTable[ind].emp = true;
-    currentSize--;
-    return true;
-}
-void updateMinFrequency() {
-    minW = MAX_FREQ;
-    for (int i = 0; i < HASH_SIZE; i++) {
-        if (!hashTable[i].emp && !hashTable[i].del) {
-            if (hashTable[i].w < minW) {
-                minW = hashTable[i].w;
-            }
-        }
-    }
-    if (minW == MAX_FREQ) {
-        minW = 0;
-    }
-}
+
 int main() {
     int cap;
     cout << "Емкость: ";
@@ -149,21 +131,24 @@ int main() {
     int Q;
     cout << "Кол-во запросов: ";
     cin >> Q;
+    
     CREATE(cap);
-    cout << "Введите команду (SET key str or GET key):" << endl;
+    cout << "Введите команды:" << endl;
+    
     for(int i = 0; i < Q; i++) {
         string command;
         cin >> command;
+        
         if(command == "SET") {
-            int key, str;
-            cin >> key >> str;
-            SET(key, str);
+            int key, value;
+            cin >> key >> value;
+            bool result = SET(key, value);
         }
         else if(command == "GET") {
             int key;
             cin >> key;
             int result = GET(key);
-            cout << result << " ";
+            cout << result  << endl;
         }
     }
     cout << endl;
