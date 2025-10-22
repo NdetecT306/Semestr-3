@@ -4,7 +4,7 @@ using namespace std;
 const int HASH_SIZE = 256;
 struct DOUBLE_HASH {
     int key;
-    string value;
+    int value;
     bool isDeleted;
     bool isEmpty;
 };
@@ -17,13 +17,13 @@ int hash2(int key) {
 }
 void INIT_HASH_TABLE() {
     for (int i = 0; i < HASH_SIZE; i++) {
-        hashTable[i].value = "";
+        hashTable[i].value = -1;
         hashTable[i].isDeleted = false;
         hashTable[i].isEmpty = true;
         hashTable[i].key = -1;
     }
 }
-bool ADD(int key, const string& value) {
+bool ADD(int key, int value) {
     int index = hash1(key);
     int step = hash2(key);
     int startIndex = index;
@@ -47,7 +47,7 @@ bool ADD(int key, const string& value) {
     }
     return false;
 }
-bool SETDEL(int key, const string& value) {
+bool SETDEL(int key, int value) {
     int index = hash1(key);
     int step = hash2(key);
     int startIndex = index;
@@ -69,7 +69,7 @@ bool SETDEL(int key, const string& value) {
     }
     return false;
 }
-bool SET_AT(int key, const string& value) {
+bool SET_AT(int key, int value) {
     int index = hash1(key);
     int step = hash2(key);
     int startIndex = index;
@@ -190,12 +190,21 @@ void partitionSet() {
         cout << "Множество пусто!" << endl;
         return;
     }
+    int originalOrder[HASH_SIZE];
+    int originalCount = 0;
+    for (int i = 0; i < HASH_SIZE; i++) {
+        if (!hashTable[i].isEmpty && !hashTable[i].isDeleted) {
+            originalOrder[originalCount++] = hashTable[i].key;
+        }
+    }
+    /*
     cout << "Ваше множество S: {";
-    for (int i = 0; i < count; i++) {
-        cout << keys[i];
-        if (i < count - 1) cout << ", ";
+    for (int i = 0; i < originalCount; i++) {
+        cout << originalOrder[i];
+        if (i < originalCount - 1) cout << ", ";
     }
     cout << "}" << endl;
+    */
     int totalSum = calculateTotalSum();
     int minDiff = findMinDifference(keys, count, totalSum);
     int subset1[HASH_SIZE], subset2[HASH_SIZE];
@@ -225,7 +234,7 @@ int main() {
     for (int i = 0; i < n; i++) {
         int num;
         cin >> num;
-        ADD(num, to_string(num));
+        ADD(num, num);
     }
     cout << "\nРезультат разбиения множества:" << endl;
     partitionSet();
