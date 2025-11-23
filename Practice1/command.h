@@ -1,18 +1,10 @@
-#include <iostream> //библиотеки
 #include <string>
-#include <algorithm>
-#include <fstream>
-#include <filesystem>
-#include <sstream>
-#include <chrono>
-#include <thread>
-#include <functional>
-#include <random>
-#include "json.hpp"
-using json = nlohmann::json;
-using namespace nlohmann::literals;
+#include "struct.h"
 using namespace std;
-namespace fs = filesystem;
+bool checkSimpleCondition(const string& condition, const Vec& tables, const Vec& currentRows);
+bool parseCondition(string cond, const Vec& tables, const Vec& currentRows);
+bool checkWhereCondition(const string& whereCond, const Vec& tables, const Vec& current_rows);
+void processCombination(size_t tableIndex, Vec& currentCombination, const Vec& tables, const Vec& columns, const string& whereCond, Vec& result);
 void SelectCommand(const string& input);
 void InsertCommand(const string& input);
 void DeleteCommand(const string& input);
