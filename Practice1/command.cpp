@@ -1,89 +1,30 @@
-#include "commands.h"
-#include "struct.h"
-#include "CSV.h"
-#include "Block.h"
-#include "struct.h"
-#include "workWithJson.h"
-Vec getTableColumns(const string& table_name) {//Получение списка колонок таблицы
-    Vec columns;
-    string path = currentSchemaName + "/" + table_name + "/0.csv";
-    ifstream file(path);
-    if (!file.is_open()) {
-        return columns;
-    }
-    string header;
-    if (getline(file, header)) {
-        stringstream ss(header);
-        string column;
-        while (getline(ss, column, ',')) {
-            columns.PUSH(column);
-        }
-    }
-    file.close();
-    return columns;
-}
-Vec readTable(const string& table_name) {// Чтение данных таблицы
-    Vec result;
-    string path = currentSchemaName + "/" + table_name;
-    if (!fs::exists(path)) {
-        return result;
-    }
-    Vec files;// Список CSV файлов
-    for (const auto& el : fs::directory_iterator(path)) {
-        if (el.is_regular_file()) {
-            string filename = el.path().filename().string();
-            if (hasCsvExtension(filename)) {
-                files.PUSH(el.path().string());
-            }
-        }
-    }
-    for (size_t i = 0; i < files.getSize(); i++) {
-        for (size_t j = i + 1; j < files.getSize(); j++) {
-            string file1 = fs::path(files[i]).filename().string();
-            string file2 = fs::path(files[j]).filename().string();
-            int num1 = stoi(file1.substr(0, file1.find('.')));
-            int num2 = stoi(file2.substr(0, file2.find('.')));
-            if (num1 > num2) {
-                string vrem = files[i];
-                files[i] = files[j];
-                files[j] = vrem;
-            }
-        }
-    }
-    for (size_t i = 0; i < files.getSize(); i++) {// Читаем данные из файлов
-        ifstream file(files[i]);
-        if (!file.is_open()) {
-            continue;
-        }
-        string line;
-        bool first = true;
-        while (getline(file, line)) {
-            if (first) {
-                first = false;
-                continue; 
-            }
-            if (!line.empty()) {
-                result.PUSH(line);
-            }
-        }
-        file.close();
-    }
-    return result;
-}
-bool checkSimpleCondition(const string& condition, const Vec& tables, const Vec& currentRows) { //Только WHERE
+#include "command.h"
+#include "lock.h"
+#include "MYCSV.h"
+#include <iostream>
+#include <sstream>
+#include <algorithm>
+#include "json.hpp"
+using namespace std;
+using json = nlohmann::json;
+extern string currentSchemaName;
+extern json schemaConfig;
+extern string mySchema;
+bool checkSimpleCondition(const string& condition, const Vec& tables, const Vec& currentRows) {// Простое сравнение с WHERe
     size_t EQUAL = condition.find('=');
-    if (EQUAL == string::npos) {
-        return true;
-    }
+    if (EQUAL == string::npos) return true;
     string leftSide = condition.substr(0, EQUAL);
     string rightSide = condition.substr(EQUAL + 1);
-    leftSide.erase(0, leftSide.find_first_not_of(" "));// Убираем пробелы
+    leftSide.erase(0, leftSide.find_first_not_of(" "));
     leftSide.erase(leftSide.find_last_not_of(" ") + 1);
     rightSide.erase(0, rightSide.find_first_not_of(" "));
     rightSide.erase(rightSide.find_last_not_of(" ") + 1);
     size_t DOT = leftSide.find('.');
     if (DOT == string::npos) {
-        return true;
+        DOT = rightSide.find('.');
+        if (DOT == string::npos) return true;
+        swap(leftSide, rightSide);
+        DOT = leftSide.find('.');
     }
     string tableName = leftSide.substr(0, DOT);
     string columnName = leftSide.substr(DOT + 1);
@@ -97,23 +38,19 @@ bool checkSimpleCondition(const string& condition, const Vec& tables, const Vec&
     if (tableInd == -1 || tableInd >= currentRows.getSize()) {
         return false;
     }
-    int colInd = getColumnIndex(tableName, columnName);// Получаем индекс колонки
-    if (colInd == -1) {
-        return false;
-    }
-    string rows = currentRows[tableInd];// Парсим строку таблицы
+    int colInd = getColumnIndex(tableName, columnName);
+    if (colInd == -1) return false;
+    string rowData = currentRows[tableInd];
     Vec columns;
-    stringstream ss(rows);
+    stringstream ss(rowData);
     string field;
     while (getline(ss, field, ',')) {
         columns.PUSH(field);
     }
-    if (colInd + 1 >= columns.getSize()) {
-        return false;
-    }
+    if (colInd + 1 >= columns.getSize()) return false;
     string leftValue = columns[colInd + 1];
     string rightValue;
-    if (rightSide[0] == '\'' && rightSide[rightSide.length()-1] == '\'') {// Обрабатываем правую часть
+    if (rightSide[0] == '\'' && rightSide[rightSide.length()-1] == '\'') {
         rightValue = rightSide.substr(1, rightSide.length() - 2);
     } else if (rightSide.find('.') != string::npos) {
         size_t rightDOT = rightSide.find('.');
@@ -126,138 +63,147 @@ bool checkSimpleCondition(const string& condition, const Vec& tables, const Vec&
                 break;
             }
         }
-        if (rightTableInd == -1 || rightTableInd >= currentRows.getSize()) {
-            return false;
-        }
+        if (rightTableInd == -1 || rightTableInd >= currentRows.getSize()) return false;
         int rightColInd = getColumnIndex(rightTable, right_column);
-        if (rightColInd == -1) {
-            return false;
-        }
-        string rightRow = currentRows[rightTableInd];// Парсим правую строку таблицы
+        if (rightColInd == -1) return false;
+        string rightRow = currentRows[rightTableInd];
         Vec rightCol;
         stringstream rightss(rightRow);
         string rightField;
         while (getline(rightss, rightField, ',')) {
             rightCol.PUSH(rightField);
         }
-        if (rightColInd + 1 >= rightCol.getSize()) {
-            return false;
-        }
+        if (rightColInd + 1 >= rightCol.getSize()) return false;
         rightValue = rightCol[rightColInd + 1];
     } else {
         rightValue = rightSide;
     }
     return (leftValue == rightValue);
 }
-bool parseCondition(string cond, const Vec& tables, const Vec& currentRows) {
+
+bool parseCondition(string cond, const Vec& tables, const Vec& currentRows) {//AND и OR
     cond.erase(0, cond.find_first_not_of(" "));
     cond.erase(cond.find_last_not_of(" ") + 1);
-    bool InQ = false;
-    int paren_depth = 0;
-    size_t OR = string::npos;
-    size_t AND = string::npos;
-    for (size_t i = 0; i < cond.length(); i++) {
-        if (cond[i] == '\'') InQ = !InQ;
-        if (cond[i] == '(') paren_depth++;
-        if (cond[i] == ')') paren_depth--;
-        if (!InQ && paren_depth == 0) {
-            if (OR == string::npos && i + 3 <= cond.length() && cond.substr(i, 3) == "OR ") {
-                OR = i;
-                i += 2;
-            }
-            else if (AND == string::npos && i + 4 <= cond.length() && cond.substr(i, 4) == "AND ") {
-                AND = i;
-                i += 3;
-            }
-        }
-    }
-    if (OR != string::npos) {
-        string leftPart = cond.substr(0, OR);
-        string rightPart = cond.substr(OR + 3);
-        leftPart.erase(0, leftPart.find_first_not_of(" "));
-        leftPart.erase(leftPart.find_last_not_of(" ") + 1);
-        rightPart.erase(0, rightPart.find_first_not_of(" "));
-        rightPart.erase(rightPart.find_last_not_of(" ") + 1);
-        return parseCondition(leftPart, tables, currentRows) || parseCondition(rightPart, tables, currentRows);
-    }
-    if (AND != string::npos) {
-        string leftPart = cond.substr(0, AND);
-        string rightPart = cond.substr(AND + 4);
-        leftPart.erase(0, leftPart.find_first_not_of(" "));
-        leftPart.erase(leftPart.find_last_not_of(" ") + 1);
-        rightPart.erase(0, rightPart.find_first_not_of(" "));
-        rightPart.erase(rightPart.find_last_not_of(" ") + 1);
-        return parseCondition(leftPart, tables, currentRows) && parseCondition(rightPart, tables, currentRows);
-    }
-    if (cond.length() >= 2 && cond[0] == '(' && cond[cond.length()-1] == ')') {
-        int depth = 0;
+    if (cond.empty()) return true;
+    if (cond[0] == '(' && cond[cond.length()-1] == ')') {
+        int depth = 1;
         bool is_outer = true;
-        for (size_t i = 0; i < cond.length(); i++) {
+        for (size_t i = 1; i < cond.length() - 1; i++) {
             if (cond[i] == '(') depth++;
             if (cond[i] == ')') depth--;
-            if (depth == 0 && i < cond.length() - 1) {
+            if (depth == 0) {
                 is_outer = false;
                 break;
             }
         }
-        if (is_outer) {
+        if (is_outer && depth == 1) {
             return parseCondition(cond.substr(1, cond.length() - 2), tables, currentRows);
         }
     }
-    return checkSimpleCondition(cond, tables, currentRows);// Если нет операторов и скобок, проверяем как простое условие
-}
-bool checkWhereCondition(const string& whereCond, const Vec& tables, const Vec& current_rows) {
-    if (whereCond.empty()) return true;
-    return parseCondition(whereCond, tables, current_rows);
-}
-void simpleCartesianProduct(const Vec& all_data, const Vec& tables, const Vec& columns, const string& whereCond, Vec& result) { //Декартово
-    int count = 0;
-    if (tables.getSize() == 1) {
-        Vec table_data;
-        string data_str = all_data[0];
-        stringstream ss(data_str);
-        string line;
-        while (getline(ss, line)) {
-            if (!line.empty()) {
-                table_data.PUSH(line);
-            }
-        }
-        for (size_t i = 0; i < table_data.getSize(); i++) {
-            Vec current_row;
-            current_row.PUSH(table_data[i]);
-            if (checkWhereCondition(whereCond, tables, current_row)) {
-                string res;
-                for (size_t colIdx = 0; colIdx < columns.getSize(); colIdx++) {
-                    if (colIdx > 0) res += ",";
-                    string fullCol = columns[colIdx];
-                    size_t DOT = fullCol.find('.');
-                    string tableName = fullCol.substr(0, DOT);
-                    string colName = fullCol.substr(DOT + 1);
-                    int colIndex = getColumnIndex(tableName, colName);
-                    if (colIndex != -1) {
-                        Vec rowColumns;// Парсим строку чтобы получить значение нужной колонки
-                        string rowData = table_data[i];
-                        stringstream row_ss(rowData);
-                        string field;
-                        while (getline(row_ss, field, ',')) {
-                            rowColumns.PUSH(field);
-                        }
-                        if (colIndex + 1 < rowColumns.getSize()) {
-                            res += rowColumns[colIndex + 1];
-                        } else {
-                            res += "NULL";
-                        }
-                    } else {
-                        res += "NULL";
-                    }
+    int paren_depth = 0;
+    bool in_quotes = false;
+    size_t orPos = string::npos;
+    size_t andPos = string::npos;
+    for (size_t i = 0; i < cond.length(); i++) {
+        char c = cond[i];
+        if (c == '\'') in_quotes = !in_quotes;
+        if (!in_quotes) {
+            if (c == '(') paren_depth++;
+            else if (c == ')') paren_depth--;
+            if (paren_depth == 0) {
+                if (andPos == string::npos && i + 3 < cond.length() && cond.substr(i, 4) == "AND ") {
+                    andPos = i;
+                } else if (orPos == string::npos && i + 2 < cond.length() && 
+                    cond.substr(i, 3) == "OR ") {
+                    orPos = i;
                 }
-                result.PUSH(res);
-                count++;
             }
         }
     }
+    if (andPos != string::npos) {
+        string left_part = cond.substr(0, andPos);
+        string right_part = cond.substr(andPos + 4);
+        left_part.erase(0, left_part.find_first_not_of(" "));
+        left_part.erase(left_part.find_last_not_of(" ") + 1);
+        right_part.erase(0, right_part.find_first_not_of(" "));
+        right_part.erase(right_part.find_last_not_of(" ") + 1);
+        bool left_result = parseCondition(left_part, tables, currentRows);
+        bool right_result = parseCondition(right_part, tables, currentRows);
+        return left_result && right_result;
+    } else if (orPos != string::npos) {
+        string left_part = cond.substr(0, orPos);
+        string right_part = cond.substr(orPos + 3);
+        left_part.erase(0, left_part.find_first_not_of(" "));
+        left_part.erase(left_part.find_last_not_of(" ") + 1);
+        right_part.erase(0, right_part.find_first_not_of(" "));
+        right_part.erase(right_part.find_last_not_of(" ") + 1);
+        bool left_result = parseCondition(left_part, tables, currentRows);
+        bool right_result = parseCondition(right_part, tables, currentRows);
+        return left_result || right_result;
+    }
+    return checkSimpleCondition(cond, tables, currentRows);
 }
-void SelectCommand(const string& input) {
+bool checkWhereCondition(const string& whereCond, const Vec& tables, const Vec& current_rows) { //Начало проверки WHERE
+    if (whereCond.empty()) return true;
+    return parseCondition(whereCond, tables, current_rows);
+}
+//Наше декартово произведение
+void processCombination(size_t tableIndex, Vec& currentCombination, const Vec& tables, const Vec& columns, const string& whereCond, Vec& result) {
+    if (tableIndex == tables.getSize()) {
+        if (checkWhereCondition(whereCond, tables, currentCombination)) {
+            string res_row;
+            for (size_t colIdx = 0; colIdx < columns.getSize(); colIdx++) {
+                if (colIdx > 0) res_row += ",";
+                string fullCol = columns[colIdx];
+                size_t DOT = fullCol.find('.');
+                if (DOT == string::npos) {
+                    res_row += "NULL";
+                    continue;
+                }
+                string tableName = fullCol.substr(0, DOT);
+                string colName = fullCol.substr(DOT + 1);
+                int targetTableIndex = -1;
+                for (size_t i = 0; i < tables.getSize(); i++) {
+                    if (tables[i] == tableName) {
+                        targetTableIndex = i;
+                        break;
+                    }
+                }
+                if (targetTableIndex == -1) {
+                    res_row += "NULL";
+                    continue;
+                }
+                int colIndex = getColumnIndex(tableName, colName);
+                if (colIndex == -1) {
+                    res_row += "NULL";
+                    continue;
+                }
+                string rowData = currentCombination[targetTableIndex];
+                Vec rowColumns;
+                stringstream row_ss(rowData);
+                string field;
+                while (getline(row_ss, field, ',')) {
+                    rowColumns.PUSH(field);
+                }
+                if (colIndex + 1 < rowColumns.getSize()) {
+                    res_row += rowColumns[colIndex + 1];
+                } else {
+                    res_row += "NULL";
+                }
+            }
+            result.PUSH(res_row);
+        }
+        return;
+    }
+    string currentTable = tables[tableIndex];
+    Vec tableData = getTableDataFromHash(currentTable);
+    for (size_t i = 0; i < tableData.getSize(); i++) {
+        currentCombination.PUSH(tableData[i]);
+        processCombination(tableIndex + 1, currentCombination, tables, columns, whereCond, result);
+        currentCombination.erase(currentCombination.getSize() - 1);
+    }
+}
+void SelectCommand(const string& input) { //SELECT
     size_t SELECT = input.find("SELECT");
     size_t FROM = input.find("FROM");
     size_t WHERE = input.find("WHERE");
@@ -318,14 +264,13 @@ void SelectCommand(const string& input) {
         whereCond.erase(0, whereCond.find_first_not_of(" "));
         whereCond.erase(whereCond.find_last_not_of(" ") + 1);
     }
-    for (size_t i = 0; i < tables.getSize(); i++) {// Проверяем существование таблиц
-        string tablePath = currentSchemaName + "/" + tables[i];
-        if (!fs::exists(tablePath)) {
-            cerr << "Таблица '" << tables[i] << "' не существует" << endl;
+    for (size_t i = 0; i < tables.getSize(); i++) {
+        if (GET_SCHEMA(tables[i]) == nullptr) {
+            cerr << "Таблица '" << tables[i] << "' не найдена в SCHEMA_HASH" << endl;
             return;
         }
     }
-    for (size_t i = 0; i < columns.getSize(); i++) {// Проверяем корректность колонок
+    for (size_t i = 0; i < columns.getSize(); i++) {
         size_t DOT = columns[i].find('.');
         if (DOT == string::npos) {
             cerr << "Неверный формат колонки: " << columns[i] << endl;
@@ -333,7 +278,7 @@ void SelectCommand(const string& input) {
         }
         string tableName = columns[i].substr(0, DOT);
         string columnName = columns[i].substr(DOT + 1);
-        bool found = false;// Проверяем, что таблица есть в FROM
+        bool found = false;
         for (size_t j = 0; j < tables.getSize(); j++) {
             if (tables[j] == tableName) {
                 found = true;
@@ -349,20 +294,10 @@ void SelectCommand(const string& input) {
             return;
         }
     }
-    Vec allTableData;
-    for (size_t i = 0; i < tables.getSize(); i++) {
-        Vec table_data = readTable(tables[i]);
-        string table_data_str;
-        for (size_t j = 0; j < table_data.getSize(); j++) {
-            if (j > 0) table_data_str += "\n";
-            table_data_str += table_data[j];
-        }
-        allTableData.PUSH(table_data_str);
-    }
     Vec result;
-    simpleCartesianProduct(allTableData, tables, columns, whereCond, result);
+    cartesianProductFromHash(tables, columns, whereCond, result);
     cout << "Результат SELECT (" << result.getSize() << " строк):" << endl;
-    for (size_t i = 0; i < columns.getSize(); i++) {// Заголовки
+    for (size_t i = 0; i < columns.getSize(); i++) {
         if (i > 0) cout << ",";
         cout << columns[i];
     }
@@ -371,7 +306,7 @@ void SelectCommand(const string& input) {
         cout << result[i] << endl;
     }
 }
-void InsertCommand(const string& input) {//INSERT INTO таблица1 VALUES ('somedata', '12345')
+void InsertCommand(const string& input) { //INSERT INTO
     size_t INTO = input.find("INTO");
     if (INTO == string::npos) {
         cout << "Не найдено ключевое слово INTO" << endl;
@@ -389,7 +324,6 @@ void InsertCommand(const string& input) {//INSERT INTO таблица1 VALUES ('
     }
     string tableName = input.substr(name, VALUES - name);
     tableName.erase(remove(tableName.begin(), tableName.end(), ' '), tableName.end());
-    int tableKey = getKeyByTableName(tableName);
     size_t openBra = input.find('(', VALUES);
     if (openBra == string::npos) {
         cerr << "Не найдена открывающая скобка" << endl;
@@ -401,7 +335,7 @@ void InsertCommand(const string& input) {//INSERT INTO таблица1 VALUES ('
         return;
     }
     string valueStr = input.substr(openBra + 1, closeBra - openBra - 1);
-    Vec element; 
+    Vec element;
     size_t ourPos = 0;
     while (ourPos < valueStr.length()) {
         while (ourPos < valueStr.length() && valueStr[ourPos] == ' ') {
@@ -415,13 +349,12 @@ void InsertCommand(const string& input) {//INSERT INTO таблица1 VALUES ('
                 return;
             }
             string value = valueStr.substr(ourPos + 1, endQuote - ourPos - 1);
-            element.PUSH(value); 
+            element.PUSH(value);
             ourPos = endQuote + 1;
             if (ourPos < valueStr.length() && valueStr[ourPos] == ',') {
                 ourPos++;
             }
-        } 
-        else {
+        } else {
             size_t COMMA = valueStr.find(',', ourPos);
             if (COMMA == string::npos) {
                 string value = valueStr.substr(ourPos);
@@ -438,22 +371,38 @@ void InsertCommand(const string& input) {//INSERT INTO таблица1 VALUES ('
             }
         }
     }
-    bool hashSuccess = true;
-    for (size_t i = 0; i < element.getSize(); i++) {
-        if (!ADD(tableKey, element[i])) {
-            cerr << "Ошибка при добавлении значения '" << element[i] << "' в хэш-таблицу" << endl;
-            hashSuccess = false;
+    int primaryKey = insertIntoCSV(tableName, element);
+    if (primaryKey != -1) {
+        string rowData = to_string(primaryKey);
+        for (size_t i = 0; i < element.getSize(); i++) {
+            rowData += "," + element[i];
         }
-    }
-    bool fileSuccess = insertIntoCSV(tableName, element);
-    if (hashSuccess && fileSuccess) {
-        cout << "Успешно добавлено в таблицу." << endl;
+        Vec hashValue;
+        hashValue.PUSH(rowData);
+        DOUBLE_HASH* tableHash = GET_SCHEMA(tableName);
+        if (tableHash != nullptr) {
+            int ind = hash1(primaryKey);
+            int step = hash2(primaryKey);
+            int startInd = ind;
+            int trials = 0;
+            while (trials < HASH_SIZE) {
+                if (tableHash[ind].getIsEmpty() || tableHash[ind].getIsDeleted()) {
+                    tableHash[ind].init(primaryKey, hashValue);
+                    cout << "Успешно добавлено." << endl;
+                    return;
+                }
+                ind = (ind + step) % HASH_SIZE;
+                trials++;
+                if (ind == startInd) break;
+            }
+        }
+        cout << "Данные добавлены в таблицу с PK: " << primaryKey << ", но возникли проблемы с SCHEMA_HASH." << endl;
     } else {
-        cout << "Что-то пошло не так." << endl;
+        cout << "Ошибка при добавлении данных в таблицу." << endl;
     }
 }
-void DeleteCommand(const string& input) { //DELETE FROM таблица1 WHERE таблица1.колонка1 = '123'
-    size_t FROM = input.find("FROM"); 
+void DeleteCommand(const string& input) { //DELETE FROM
+    size_t FROM = input.find("FROM");
     if (FROM == string::npos) {
         cerr << "Не найдено ключевое слово FROM." << endl;
         return;
@@ -470,7 +419,6 @@ void DeleteCommand(const string& input) { //DELETE FROM таблица1 WHERE т
     }
     string tableName = input.substr(name, WHERE - name);
     tableName.erase(remove(tableName.begin(), tableName.end(), ' '), tableName.end());
-    int tableKey = getKeyByTableName(tableName);
     string cond = input.substr(WHERE + 5);
     size_t DOT = cond.find('.');
     if (DOT == string::npos) {
@@ -489,7 +437,7 @@ void DeleteCommand(const string& input) { //DELETE FROM таблица1 WHERE т
         return;
     }
     string columnName = cond.substr(DOT + 1, EQUAL - DOT - 1);
-    columnName.erase(remove(columnName.begin(), columnName.end(), ' '), columnName.end());
+    columnName.erase(remove(columnName.begin(), columnName.end(), ' '), columnName.end()); 
     size_t openKav = cond.find('\'', EQUAL);
     if (openKav == string::npos) {
         cerr << "Не найдена открывающая кавычка" << endl;
@@ -501,10 +449,29 @@ void DeleteCommand(const string& input) { //DELETE FROM таблица1 WHERE т
         return;
     }
     string value = cond.substr(openKav + 1, closeKav - openKav - 1);
-    bool hashDeleted = SETDEL(tableKey, value);
-    bool fileDeleted = deleteFromCSV(tableName, columnName, value);
-    if (hashDeleted || fileDeleted) {
-        cout << "Удаление прошло успешно." << endl;
+    Vec deletedPrimaryKeys;
+    bool fileDeleted = deleteFromCSV(tableName, columnName, value, deletedPrimaryKeys);
+    bool hashDeleted = false;
+    DOUBLE_HASH* tableHash = GET_SCHEMA(tableName);
+    if (tableHash != nullptr) {
+        for (size_t i = 0; i < deletedPrimaryKeys.getSize(); i++) {
+            try {
+                int primaryKey = stoi(deletedPrimaryKeys[i]);
+                for (int j = 0; j < HASH_SIZE; j++) {
+                    if (tableHash[j].isValid() && tableHash[j].getKey() == primaryKey) {
+                        tableHash[j].setIsDeleted(true);
+                        tableHash[j].setIsEmpty(true);
+                        hashDeleted = true;
+                        break;
+                    }
+                }
+            } catch (const exception& e) {
+                cerr << "Ошибка преобразования первичного ключа: " << deletedPrimaryKeys[i] << endl;
+            }
+        }
+    }
+    if (fileDeleted || hashDeleted) {
+        cout << "Удаление прошло успешно. Удалено записей: " << deletedPrimaryKeys.getSize() << endl;
     } else {
         cout << "Строки для удаления не найдены." << endl;
     }
