@@ -1,140 +1,110 @@
-#pragma once  // Добавляем защиту от множественного включения
-#include <iostream>
+#ifndef STRUCTURES_H
+#define STRUCTURES_H
+
 #include <string>
-#include <algorithm>
-#include <fstream>
-#include <filesystem>
-#include <sstream>
-#include <chrono>
-#include <thread>
-#include <functional>
-#include <random>
-#include <unordered_map>
 #include "json.hpp"
 
-using json = nlohmann::json;
-using namespace nlohmann::literals;
 using namespace std;
-namespace fs = filesystem;
-class DOUBLE_HASH;
+using json = nlohmann::json;
 
-class Vec { // Строковый вектор 
-private:  
-    string* data; 
+// Константы
+extern const int HASH_SIZE;
+extern const int SCHEMA_HASH_SIZE;
+
+// Класс Vec - вектор для строк
+class Vec {
+private:
+    string* data;
     size_t size;
     size_t capacity;
 
 public:
-    Vec() : data(nullptr), size(0), capacity(0) {} // Конструктор 
-    ~Vec() { // Деструктор
-        delete[] data;
-    }
-    Vec(const Vec& other) : data(nullptr), size(0), capacity(0) { // Копирование
-        if (other.size > 0) {
-            reserve(other.size);
-            for (size_t i = 0; i < other.size; i++) {
-                data[i] = other.data[i];
-            }
-            size = other.size;
-        }
-    }
+    Vec();
+    Vec(const Vec& other);
+    Vec& operator=(const Vec& other);
+    ~Vec();
+
+    void reserve(size_t newCap);
     void PUSH(const string& value);
     void erase(size_t index);
-    void reserve(size_t new_capacity);
-    void clear() { // Очистка
-        size = 0;
-    }
-    string& operator[](size_t index) { // Получение по индексу
-        return data[index];
-    }
-    string& operator[](size_t index) const { // Константная версия
-        return data[index];
-    }
-    size_t getSize() const { // Функция получения размера
-        return size;
-    }
-    bool empty() const { // Функция проверки на пустоту
-        return size == 0;
-    }
-    Vec& operator=(const Vec& other) { 
-        if (this != &other) {
-            if (other.size > capacity) {
-                delete[] data;
-                data = new string[other.size];
-                capacity = other.size;
-            }
-            for (size_t i = 0; i < other.size; i++) {
-                data[i] = other.data[i];
-            }
-            size = other.size;
-        }
-        return *this;
-    }
-    void sort() { // Сортировка элементов вектора
-        if (size <= 1) return;
-        std::sort(data, data + size);
-    }
-    string* begin() { // Указатели
-        return data;
-    }
-    string* end() {
-        return data + size;
-    } 
-    string* begin() const {
-        return data;
-    }
-    string* end() const {
-        return data + size;
-    }
+    void clear();
+    string& operator[](size_t index);
+    const string& operator[](size_t index) const;
+    size_t getSize() const;
+    bool empty() const;
+    void sort();
+
+private:
+    void mergeSort(size_t left, size_t right);
+    void merge(size_t left, size_t mid, size_t right);
 };
-const int HASH_SIZE = 256; // Структуры и глобальные переменные
-class DOUBLE_HASH { // Класс хэш-таблицы
+
+// Класс DOUBLE_HASH - хэш-таблица
+class DOUBLE_HASH {
 private:
     int key;
     Vec value;  
     bool isDeleted;
     bool isEmpty;
+
 public:
-    DOUBLE_HASH() : key(-1), value(), isDeleted(false), isEmpty(true) {}
-    DOUBLE_HASH(int k, const Vec& val, bool deleted = false, bool empty = false) 
-        : key(k)
-        , value(val)
-        , isDeleted(deleted)
-        , isEmpty(empty) {}
-    int getKey() const { return key; }
-    Vec& getValue() { return value; }
-    const Vec& getValue() const { return value; }
-    bool getIsDeleted() const { return isDeleted; }
-    bool getIsEmpty() const { return isEmpty; }
-    void setKey(int k) { key = k; }
-    void setValue(const Vec& val) { value = val; }
-    void setIsDeleted(bool deleted) { isDeleted = deleted; }
-    void setIsEmpty(bool empty) { isEmpty = empty; }
-    void clear() {
-        value.clear();
-        key = -1;
-        isDeleted = false;
-        isEmpty = true;
-    }
-    void init(int k, const Vec& val) {
-        key = k;
-        value = val;
-        isDeleted = false;
-        isEmpty = false;
-    }
-    bool isValid() const {
-        return !isEmpty && !isDeleted;
-    }
+    DOUBLE_HASH();
+    int getKey() const;
+    Vec& getValue();
+    const Vec& getValue() const;
+    bool getIsDeleted() const;
+    bool getIsEmpty() const;
+    void setKey(int k);
+    void setValue(const Vec& val);
+    void setIsDeleted(bool deleted);
+    void setIsEmpty(bool empty);
+    void clear();
+    void init(int k, const Vec& val);
+    bool isValid() const;
 };
-extern DOUBLE_HASH hashTable[HASH_SIZE]; 
-extern json schemaConfig;
-extern string mySchema;
-extern string currentSchemaName;
-extern int tuplesLimit;
-extern unordered_map<string, int> tableKeys;
+
+// Класс SCHEMA_HASH - хэш-таблица для схем
+class SCHEMA_HASH {
+private:
+    string key;
+    DOUBLE_HASH* value;
+    bool isDeleted;
+    bool isEmpty;
+
+public:
+    SCHEMA_HASH();
+    string getKey() const;
+    DOUBLE_HASH* getValue();
+    const DOUBLE_HASH* getValue() const;
+    bool getIsDeleted() const;
+    bool getIsEmpty() const;
+    void setKey(const string& k);
+    void setValue(DOUBLE_HASH* val);
+    void setIsDeleted(bool deleted);
+    void setIsEmpty(bool empty);
+    void clear();
+    void init(const string& k, DOUBLE_HASH* val);
+    bool isValid() const;
+};
+
+// Глобальные переменные
+extern DOUBLE_HASH hashTable[];
+extern SCHEMA_HASH schemaHashTable[];
+
+// Функции хэширования
 int hash1(int key);
 int hash2(int key);
+int schemaHash1(const string& key);
+int schemaHash2(const string& key);
+
+// Базовые операции с хэш-таблицами
 void CREATETABLE();
 void CLEAR();
-bool ADD(int key, string value);
-bool SETDEL(int key, string value);
+bool ADD(int key, const Vec& value);
+bool SETDEL(int key, const string& value);
+void CREATE_SCHEMA_TABLE();
+void CLEAR_SCHEMA_TABLE();
+bool ADD_SCHEMA(const string& key, DOUBLE_HASH* value);
+DOUBLE_HASH* GET_SCHEMA(const string& key);
+
+#endif
