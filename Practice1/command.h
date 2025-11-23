@@ -1,3 +1,5 @@
+#ifndef SQL_COMMANDS_H
+#define SQL_COMMANDS_H
 #include <string>
 #include "struct.h"
 using namespace std;
@@ -8,3 +10,4 @@ void processCombination(size_t tableIndex, Vec& currentCombination, const Vec& t
 void SelectCommand(const string& input);
 void InsertCommand(const string& input);
 void DeleteCommand(const string& input);
+#endif 
