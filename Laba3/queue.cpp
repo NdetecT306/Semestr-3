@@ -12,25 +12,34 @@ void Queue::QPUSH(Queue*& head, Queue*& tail, string str) {
         tail = element;
     }
 }
-void Queue::QDELETE(Queue*& ptr) { 
-    if (ptr == nullptr) {
+
+void Queue::QDELETE(Queue*& head, Queue*& tail) {  // Добавляем tail в параметры
+    if (head == nullptr) {
         cout << "Очередь пуста" << endl;
         return;
     }
-    Queue* element = ptr;
-    ptr = ptr->site;
+    Queue* element = head;
+    head = head->site;
+    if (head == nullptr) {  // Если очередь стала пустой, обнуляем tail
+        tail = nullptr;
+    }
     delete element;
 }
-string Queue::QPOP(Queue*& ptr) {
-    if (ptr == nullptr) {
+
+string Queue::QPOP(Queue*& head, Queue*& tail) {  // Добавляем tail в параметры
+    if (head == nullptr) {
         return "Очередь пуста";
     }
-    Queue* element = ptr;
+    Queue* element = head;
     string item = element->toy;
-    ptr = ptr->site;
+    head = head->site;
+    if (head == nullptr) {  // Если очередь стала пустой, обнуляем tail
+        tail = nullptr;
+    }
     delete element;
     return item;
 }
+
 void Queue::readQueue(Queue* ptr) { 
     if (ptr == nullptr) {
         cout << "Очередь пуста" << endl;
@@ -43,6 +52,7 @@ void Queue::readQueue(Queue* ptr) {
     }
     cout << endl;
 }
+
 int Queue::countQueue(Queue* ptr) { 
     int count = 0;
     Queue* element = ptr;
@@ -52,10 +62,10 @@ int Queue::countQueue(Queue* ptr) {
     }
     return count;
 }
-Queue::~Queue() {
-    while (site != nullptr) {
-        Queue* temp = site;
-        site = site->site;
-        delete temp;
+void Queue::clearQueue(Queue*& head, Queue*& tail) {
+    while (head != nullptr) {
+        Queue::QDELETE(head, tail);
     }
+}
+Queue::~Queue() {
 }
