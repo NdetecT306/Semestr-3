@@ -7,14 +7,94 @@
 #include <memory>
 #include <locale>
 #include <codecvt>
+#include <functional>
 using namespace std;
 using namespace sf;
-//Игровой элемент глобально
+class IGameController {// Интерфейс для получателей команд
+public:
+    virtual ~IGameController() = default;
+    virtual void startNewRound(int playerChoice) = 0;
+    virtual void playerMakeChoice(int playerIndex, int choice) = 0;
+    virtual void restartGame() = 0;
+    virtual void prepareForDuel(int participant1, int participant2) = 0;
+};
+class GameCommand {
+public:
+    virtual ~GameCommand() = default;
+    virtual void execute() = 0;
+};
+class StartNewRoundCommand : public GameCommand {
+private:
+    IGameController* controller;
+    int playerChoice;
+public:
+    StartNewRoundCommand(IGameController* controller, int choice) : controller(controller), playerChoice(choice) {}
+    void execute() override {
+        if (controller) controller->startNewRound(playerChoice);
+    }
+};
+class PlayerChoiceCommand : public GameCommand {
+private:
+    IGameController* controller;
+    int playerIndex;
+    int choice;
+public:
+    PlayerChoiceCommand(IGameController* controller, int playerIndex, int choice) : controller(controller), playerIndex(playerIndex), choice(choice) {}
+    void execute() override {
+        if (controller) controller->playerMakeChoice(playerIndex, choice);
+    }
+};
+class RestartGameCommand : public GameCommand {
+private:
+    IGameController* controller;
+public:
+    RestartGameCommand(IGameController* controller) : controller(controller) {}
+    void execute() override {
+        if (controller) controller->restartGame();
+    }
+};
+class PrepareDuelCommand : public GameCommand {
+private:
+    IGameController* controller;
+    int participant1;
+    int participant2;
+public:
+    PrepareDuelCommand(IGameController* controller, int p1, int p2) : controller(controller), participant1(p1), participant2(p2) {}
+    void execute() override {
+        if (controller) controller->prepareForDuel(participant1, participant2);
+    }
+};
+class GameCommandInvoker { //Управляет историей команд и их выполнением
+private:
+    vector<unique_ptr<GameCommand>> commandHistory;
+    size_t currentIndex;
+public:
+    GameCommandInvoker() : currentIndex(0) {}
+    void executeCommand(unique_ptr<GameCommand> command) {
+        if (currentIndex < commandHistory.size()) {
+            commandHistory.resize(currentIndex);
+        }
+        command->execute();
+        commandHistory.push_back(std::move(command));
+        currentIndex = commandHistory.size();
+    }
+    void redo() {
+        if (currentIndex < commandHistory.size()) {
+            commandHistory[currentIndex]->execute();
+            currentIndex++;
+        }
+    }
+    void clearHistory() {
+        commandHistory.clear();
+        currentIndex = 0;
+    }
+};
+// Игровой элемент глобально
 class GameElement {
 protected:
-    string name; //Элемент
-    string textureFile; //.jpg
-    vector<int> beatsInd; //Кого побеждает 
+    string name; // Элемент
+    string textureFile; // .jpg
+    vector<int> beatsInd; // Кого побеждает 
     vector<int> losesToInd;// Кому проигрывает
 public:
     GameElement(const string& name, const string& textureFile, const vector<int>& beats, const vector<int>& losesTo)
@@ -23,13 +103,13 @@ public:
     virtual unique_ptr<class Card> createCard(const Vector2f& position, const Vector2f& size, const Color& bgColor) = 0;
     string getName() const { return name; }
     string getTextureFile() const { return textureFile; }
-    bool beats(int elementIndex) const { //Победа
+    bool beats(int elementIndex) const { // Победа
         for (int ind : beatsInd) {
             if (ind == elementIndex) return true;
         }
         return false;
     }
-    bool losesTo(int elementIndex) const { //Проигрыш
+    bool losesTo(int elementIndex) const { // Проигрыш
         for (int ind : losesToInd) {
             if (ind == elementIndex) return true;
         }
@@ -54,7 +134,7 @@ private:
     string textureFile;
     bool textureLoaded;
 public:
-    Card(const Vector2f& position, const Vector2f& size, const Color& bgColor, int elemIndex, const std::string& name, const std::string& texFile) 
+    Card(const Vector2f& position, const Vector2f& size, const Color& bgColor, int elemIndex, const string& name, const string& texFile) 
         : isThrown(false), animationSpeed(8.0f), isHovered(false), elementInd(elemIndex), elementName(name), textureFile(texFile), 
           textureLoaded(false) {
         shape = RectangleShape(size);
@@ -77,9 +157,7 @@ public:
             updateSpritePosition();
             return true;
         }
-        vector<string> paths = {
-            "./" + textureFile
-        };
+        vector<string> paths = {"./" + textureFile};
         for (const auto& path : paths) {
             if (texture.loadFromFile(path)) {
                 sprite.setTexture(texture, true);
@@ -168,7 +246,7 @@ public:
     Vector2f getOriginalPosition() const { return origPos; }
     Vector2f getOriginalSize() const { return origSize; }
 };
-// Игровые элементы
+// Наши объекты
 class Rock : public GameElement {
 public:
     Rock() : GameElement("Камень", "rock.jpg", {1, 3}, {2, 4}) {}
@@ -204,7 +282,7 @@ public:
         return make_unique<Card>(position, size, bgColor, 4, "Спок", "spock.jpg");
     }
 };
-// Правила игры
+// Правила игры 
 class GameRules {
 private:
     vector<unique_ptr<GameElement>> elements;
@@ -217,8 +295,7 @@ public:
         elements.push_back(make_unique<Spock>());
     }
     bool beats(int attacker, int defender) const {
-        if (attacker < 0 || attacker >= elements.size() || 
-            defender < 0 || defender >= elements.size()) {
+        if (attacker < 0 || attacker >= elements.size() || defender < 0 || defender >= elements.size()) {
             return false;
         }
         return elements[attacker]->beats(defender);
@@ -245,7 +322,7 @@ public:
         return elements.size();
     }
 };
-// Игорк
+// Игрок
 class Player {
 protected:
     vector<unique_ptr<Card>> cards;
@@ -408,8 +485,8 @@ public:
     }
     bool isActive() const { return active; }
 };
-// Сама игра
-class Game {
+// Сама игра 
+class Game : public IGameController {
 private:
     RenderWindow window;
     GameRules rules;
@@ -440,6 +517,7 @@ private:
     bool waitingForPlayerChoiceInDuel;
     bool choicesRevealed;
     int duelRoundCount;
+    GameCommandInvoker commandInvoker;
 public:
     Game() : 
         window(VideoMode(1700, 700), L"Камень Ножницы Бумага Ящерица Спок", Style::Default),
@@ -479,6 +557,7 @@ public:
         restartText.setFont(font);
         restartText.setCharacterSize(30);
         restartText.setFillColor(Color::Cyan);
+        restartText.setString(L"Нажмите ПРОБЕЛ для новой игры");
         duelText.setFont(font);
         duelText.setCharacterSize(30);
         duelText.setFillColor(Color::Yellow);
@@ -492,6 +571,77 @@ public:
             update(deltaTime);
             render();
         }
+    }
+    void startNewRound(int playerChoice) override {
+        roundInProgress = true;
+        roundFinished = false;
+        isDuelMode = false;
+        preparingForDuel = false;
+        duelParticipants.clear();
+        waitingForPlayerChoiceInDuel = false;
+        choicesRevealed = false;
+        duelRoundCount = 0;
+        crossPlayer.reset();
+        crossBot1.reset();
+        crossBot2.reset();
+        player->makeChoice(playerChoice);
+        bot1->makeChoice();
+        bot2->makeChoice();
+        revealClock.restart();
+    }
+    void playerMakeChoice(int playerIndex, int choice) override {
+        if (playerIndex == 0) {
+            player->makeChoice(choice);
+        } else if (playerIndex == 1) {
+            bot1->makeChoice(choice);
+        } else if (playerIndex == 2) {
+            bot2->makeChoice(choice);
+        }
+    }
+    void restartGame() override {
+        gameOver = false;
+        winnerName = L"";
+        player->resetScore();
+        bot1->resetScore();
+        bot2->resetScore();
+        player->resetToOriginalPositions();
+        bot1->resetToOriginalPositions();
+        bot2->resetToOriginalPositions();
+        crossPlayer.reset();
+        crossBot1.reset();
+        crossBot2.reset();
+        roundInProgress = false;
+        roundFinished = false;
+        isDuelMode = false;
+        preparingForDuel = false;
+        duelParticipants.clear();
+        waitingForPlayerChoiceInDuel = false;
+        choicesRevealed = false;
+        duelRoundCount = 0;
+        updateScoreDisplay();
+        commandInvoker.clearHistory();
+    }
+    void prepareForDuel(int participant1, int participant2) override {
+        preparingForDuel = true;
+        isDuelMode = false;
+        duelParticipants = {participant1, participant2};
+        duelStartClock.restart();
+        duelRoundCount = 1;
+        player->resetChoiceOnly();
+        bot1->resetChoiceOnly();
+        bot2->resetChoiceOnly();
+        player->resetToOriginalPositions();
+        bot1->resetToOriginalPositions();
+        bot2->resetToOriginalPositions();
+        crossPlayer.reset();
+        crossBot1.reset();
+        crossBot2.reset();
+        string names[] = {"Игрок", "Бот 1", "Бот 2"};
+        wstring duelMsg = L"ПОДГОТОВКА К ДУЭЛИ: " + stringToWstring(names[participant1]) + L" vs " + stringToWstring(names[participant2]);
+        duelText.setString(duelMsg);
+        FloatRect textRect = duelText.getLocalBounds();
+        duelText.setOrigin(textRect.left + textRect.width / 2.0f, textRect.top + textRect.height / 2.0f);
+        duelText.setPosition(850, 320);
     }
 private:
     void loadFont() {
@@ -557,28 +707,6 @@ private:
             restartText.setPosition(850, 350);
         }
     }
-    void restartGame() {
-        gameOver = false;
-        winnerName = L"";
-        player->resetScore();
-        bot1->resetScore();
-        bot2->resetScore();
-        player->resetToOriginalPositions();
-        bot1->resetToOriginalPositions();
-        bot2->resetToOriginalPositions();
-        crossPlayer.reset();
-        crossBot1.reset();
-        crossBot2.reset();
-        roundInProgress = false;
-        roundFinished = false;
-        isDuelMode = false;
-        preparingForDuel = false;
-        duelParticipants.clear();
-        waitingForPlayerChoiceInDuel = false;
-        choicesRevealed = false;
-        duelRoundCount = 0;
-        updateScoreDisplay();
-    }
     void processEvents() {
         Event event;
         while (window.pollEvent(event)) {
@@ -587,7 +715,10 @@ private:
             }
             if (event.type == Event::KeyPressed && gameOver) {
                 if (event.key.code == Keyboard::Space) {
-                    restartGame();
+                    commandInvoker.executeCommand(make_unique<RestartGameCommand>(this));
+                }
+                else if (event.key.code == Keyboard::Y && event.key.control) {
+                    commandInvoker.redo();
                 }
             }
             if (event.type == Event::MouseButtonPressed) {
@@ -597,14 +728,20 @@ private:
                         // Игрок выбирает карту для дуэли
                         for (int i = 0; i < player->getNumberOfCards(); i++) {
                             if (player->getCard(i).contains(mousePos)) {
-                                player->makeChoice(i);
+                                commandInvoker.executeCommand(
+                                    make_unique<PlayerChoiceCommand>(this, 0, i)
+                                );
                                 waitingForPlayerChoiceInDuel = false;
                                 // Боты делают выбор сразу
                                 if (find(duelParticipants.begin(), duelParticipants.end(), 1) != duelParticipants.end()) {
-                                    bot1->makeChoice();
+                                    commandInvoker.executeCommand(
+                                        make_unique<PlayerChoiceCommand>(this, 1, -1)
+                                    );
                                 }
                                 if (find(duelParticipants.begin(), duelParticipants.end(), 2) != duelParticipants.end()) {
-                                    bot2->makeChoice();
+                                    commandInvoker.executeCommand(
+                                        make_unique<PlayerChoiceCommand>(this, 2, -1)
+                                    );
                                 }
                                 // Сразу выбрасываем карты для дуэли
                                 throwCardsForDuel();
@@ -617,7 +754,9 @@ private:
                         // Обычный выбор карты для нового раунда
                         for (int i = 0; i < player->getNumberOfCards(); i++) {
                             if (player->getCard(i).contains(mousePos)) {
-                                startNewRound(i);
+                                commandInvoker.executeCommand(
+                                    make_unique<StartNewRoundCommand>(this, i)
+                                );
                                 break;
                             }
                         }
@@ -630,18 +769,18 @@ private:
         if (duelParticipants.size() != 2) return;
         // Если дуэль между игроком и ботом 1
         if ((duelParticipants[0] == 0 && duelParticipants[1] == 1) || (duelParticipants[0] == 1 && duelParticipants[1] == 0)) {
-            player->throwCardToPosition(0);  // Позиция игрока (центр)
-            bot1->throwCardToPosition(1);    // Позиция бота 1 (слева)
+            player->throwCardToPosition(0);  
+            bot1->throwCardToPosition(1);    
         }
         // Если дуэль между игроком и ботом 2
         else if ((duelParticipants[0] == 0 && duelParticipants[1] == 2) || (duelParticipants[0] == 2 && duelParticipants[1] == 0)) {
-            player->throwCardToPosition(0);  // Позиция игрока (центр)
-            bot2->throwCardToPosition(2);    // Позиция бота 2 (справа)
+            player->throwCardToPosition(0);  
+            bot2->throwCardToPosition(2);    
         }
         // Если дуэль между ботами
         else if ((duelParticipants[0] == 1 && duelParticipants[1] == 2) || (duelParticipants[0] == 2 && duelParticipants[1] == 1)) {
-            bot1->throwCardToPosition(1);    // Позиция бота 1 (слева)
-            bot2->throwCardToPosition(2);    // Позиция бота 2 (справа)
+            bot1->throwCardToPosition(1);    
+            bot2->throwCardToPosition(2);    
         }
     }
     void update(float deltaTime) {
@@ -664,9 +803,7 @@ private:
             if (!choicesRevealed) {
                 float elapsed = revealClock.getElapsedTime().asSeconds();
                 if (elapsed > 0.5f) {
-                    // Бросаем карты
                     if (isDuelMode) {
-                        // Карты уже должны быть выброшены в throwCardsForDuel()
                     } else {
                         player->throwCardToPosition(0);
                         bot1->throwCardToPosition(1);
@@ -677,7 +814,6 @@ private:
             }
             if (choicesRevealed) {
                 float elapsed = revealClock.getElapsedTime().asSeconds();
-                
                 if (elapsed > 1.5f) {
                     determineRoundResult();
                 }
@@ -713,46 +849,6 @@ private:
         }
         window.display();
     }
-    void startNewRound(int playerChoice) {
-        if (gameOver) return;
-        roundInProgress = true;
-        roundFinished = false;
-        isDuelMode = false;
-        preparingForDuel = false;
-        duelParticipants.clear();
-        waitingForPlayerChoiceInDuel = false;
-        choicesRevealed = false;
-        duelRoundCount = 0;
-        crossPlayer.reset();
-        crossBot1.reset();
-        crossBot2.reset();
-        player->makeChoice(playerChoice);
-        bot1->makeChoice();
-        bot2->makeChoice();
-        revealClock.restart();
-    }
-    void prepareForDuel(int participant1, int participant2) {
-        preparingForDuel = true;
-        isDuelMode = false;
-        duelParticipants = {participant1, participant2};
-        duelStartClock.restart();
-        duelRoundCount = 1;
-        player->resetChoiceOnly();
-        bot1->resetChoiceOnly();
-        bot2->resetChoiceOnly();
-        player->resetToOriginalPositions();
-        bot1->resetToOriginalPositions();
-        bot2->resetToOriginalPositions();
-        crossPlayer.reset();
-        crossBot1.reset();
-        crossBot2.reset();
-        string names[] = {"Игрок", "Бот 1", "Бот 2"};
-        wstring duelMsg = L"ПОДГОТОВКА К ДУЭЛИ: " + stringToWstring(names[participant1]) + L" vs " + stringToWstring(names[participant2]);
-        duelText.setString(duelMsg);
-        FloatRect textRect = duelText.getLocalBounds();
-        duelText.setOrigin(textRect.left + textRect.width / 2.0f, textRect.top + textRect.height / 2.0f);
-        duelText.setPosition(850, 320);
-    }
     void startDuelAfterPreparation() {
         isDuelMode = true;
         roundInProgress = true;
@@ -766,7 +862,8 @@ private:
             player->resetChoiceOnly();
             waitingForPlayerChoiceInDuel = true;
             string names[] = {"Игрок", "Бот 1", "Бот 2"};
-            wstring duelMsg = L"ДУЭЛЬ: " + stringToWstring(names[duelParticipants[0]]) + L" vs " + stringToWstring(names[duelParticipants[1]]) + L"\nИгрок, выберите карту!";
+            wstring duelMsg = L"ДУЭЛЬ: " + stringToWstring(names[duelParticipants[0]]) + L" vs " + stringToWstring(names[duelParticipants[1]]) + 
+                              L"\nИгрок, выберите карту!";
             duelText.setString(duelMsg);
             FloatRect textRect = duelText.getLocalBounds();
             duelText.setOrigin(textRect.left + textRect.width / 2.0f,textRect.top + textRect.height / 2.0f);
@@ -787,7 +884,6 @@ private:
             FloatRect textRect = duelText.getLocalBounds();
             duelText.setOrigin(textRect.left + textRect.width / 2.0f,textRect.top + textRect.height / 2.0f);
             duelText.setPosition(850, 320);
-            // Выбрасываем карты для дуэли ботов
             throwCardsForDuel();
             revealClock.restart();
         }
@@ -803,9 +899,8 @@ private:
                 int p2 = duelParticipants[1];
                 int choice1 = (p1 == 0) ? playerChoice : (p1 == 1) ? bot1Choice : bot2Choice;
                 int choice2 = (p2 == 0) ? playerChoice : (p2 == 1) ? bot1Choice : bot2Choice;
-                // Проверяем, что выборы сделаны
                 if (choice1 == -1 || choice2 == -1) {
-                    return; // Еще не все сделали выбор
+                    return; 
                 }
                 // Обработка ситуации, когда выбраны одинаковые карты в дуэли
                 if (choice1 == choice2) {
@@ -820,11 +915,9 @@ private:
                     player->resetToOriginalPositions();
                     bot1->resetToOriginalPositions();
                     bot2->resetToOriginalPositions();
-                    // Сбрасываем анимацию
                     crossPlayer.reset();
                     crossBot1.reset();
                     crossBot2.reset();
-                    // Снова начинаем дуэль
                     startDuelAfterPreparation();
                     return;
                 } 
@@ -840,7 +933,6 @@ private:
             }
             return;
         }
-        // Проверяем, что все сделали выбор
         if (playerChoice == -1 || bot1Choice == -1 || bot2Choice == -1) {
             return;
         }
@@ -853,6 +945,7 @@ private:
             return;
         }
         if (playerChoice == bot1Choice && bot1Choice == bot2Choice) {
+            // Ничья для всех - ничего не делаем
         } 
         else if (playerChoice == bot1Choice) {
             if (rules.beats(bot2Choice, playerChoice)) {
@@ -860,7 +953,9 @@ private:
                 animateCrossForLoser(0);
                 animateCrossForLoser(1);
             } else {
-                prepareForDuel(0, 1);
+                commandInvoker.executeCommand(
+                    make_unique<PrepareDuelCommand>(this, 0, 1)
+                );
                 return;
             }
         } 
@@ -870,7 +965,9 @@ private:
                 animateCrossForLoser(0);
                 animateCrossForLoser(2);
             } else {
-                prepareForDuel(0, 2);
+                commandInvoker.executeCommand(
+                    make_unique<PrepareDuelCommand>(this, 0, 2)
+                );
                 return;
             }
         } 
@@ -880,11 +977,12 @@ private:
                 animateCrossForLoser(1);
                 animateCrossForLoser(2);
             } else {
-                prepareForDuel(1, 2);
+                commandInvoker.executeCommand(
+                    make_unique<PrepareDuelCommand>(this, 1, 2)
+                );
                 return;
             }
         }
-        
         checkGameOver();
         roundFinished = true;
     }
@@ -911,7 +1009,6 @@ private:
         updateScoreDisplay();
     }
     void animateCrossForLoser(int loserIndex) {
-        // Безопасное получение карты
         Card* card = nullptr;
         if (loserIndex == 0) {
             int choice = player->getChoice();
@@ -940,7 +1037,6 @@ private:
         }
     }
     void animateCrossesForThreePlayers(int winnerIndex, int playerChoice, int bot1Choice, int bot2Choice) {
-        // Анимация для обычного раунда с тремя игроками
         if (winnerIndex == 0) {
             Card* card1 = bot1->getCardPtr(bot1Choice);
             Card* card2 = bot2->getCardPtr(bot2Choice);
