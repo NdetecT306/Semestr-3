@@ -10,19 +10,21 @@
 #include <functional>
 using namespace std;
 using namespace sf;
-class IGameController {// Интерфейс для получателей команд
+// Интерфейс для получателей команд
+class IGameController {
 public:
     virtual ~IGameController() = default;
     virtual void startNewRound(int playerChoice) = 0;
     virtual void playerMakeChoice(int playerIndex, int choice) = 0;
-    virtual void restartGame() = 0;
     virtual void prepareForDuel(int participant1, int participant2) = 0;
 };
+// Базовый класс команды
 class GameCommand {
 public:
     virtual ~GameCommand() = default;
     virtual void execute() = 0;
 };
+// Команда для начала нового раунда
 class StartNewRoundCommand : public GameCommand {
 private:
     IGameController* controller;
@@ -33,6 +35,7 @@ public:
         if (controller) controller->startNewRound(playerChoice);
     }
 };
+// Команда для выбора карты игроком
 class PlayerChoiceCommand : public GameCommand {
 private:
     IGameController* controller;
@@ -44,15 +47,7 @@ public:
         if (controller) controller->playerMakeChoice(playerIndex, choice);
     }
 };
-class RestartGameCommand : public GameCommand {
-private:
-    IGameController* controller;
-public:
-    RestartGameCommand(IGameController* controller) : controller(controller) {}
-    void execute() override {
-        if (controller) controller->restartGame();
-    }
-};
+// Команда для подготовки к дуэли
 class PrepareDuelCommand : public GameCommand {
 private:
     IGameController* controller;
@@ -64,7 +59,8 @@ public:
         if (controller) controller->prepareForDuel(participant1, participant2);
     }
 };
-class GameCommandInvoker { //Управляет историей команд и их выполнением
+// Управляет историей команд и их выполнением
+class GameCommandInvoker {
 private:
     vector<unique_ptr<GameCommand>> commandHistory;
     size_t currentIndex;
@@ -78,73 +74,68 @@ public:
         commandHistory.push_back(std::move(command));
         currentIndex = commandHistory.size();
     }
-    void redo() {
-        if (currentIndex < commandHistory.size()) {
-            commandHistory[currentIndex]->execute();
-            currentIndex++;
-        }
-    }
     void clearHistory() {
         commandHistory.clear();
         currentIndex = 0;
     }
 };
-// Игровой элемент глобально
+class Card;
+// Игровой элемент
 class GameElement {
 protected:
-    string name; // Элемент
-    string textureFile; // .jpg
-    vector<int> beatsInd; // Кого побеждает 
-    vector<int> losesToInd;// Кому проигрывает
+    string name;
+    string textureFile;
+    vector<int> beatsIndices;
+    vector<int> losesToIndices;
 public:
     GameElement(const string& name, const string& textureFile, const vector<int>& beats, const vector<int>& losesTo)
-        : name(name), textureFile(textureFile), beatsInd(beats), losesToInd(losesTo) {}
+    : name(name), textureFile(textureFile), beatsIndices(beats), losesToIndices(losesTo) {}
     virtual ~GameElement() = default;
-    virtual unique_ptr<class Card> createCard(const Vector2f& position, const Vector2f& size, const Color& bgColor) = 0;
+    virtual unique_ptr<Card> createCard(const Vector2f& position, const Vector2f& size, const Color& bgColor) = 0;
     string getName() const { return name; }
     string getTextureFile() const { return textureFile; }
-    bool beats(int elementIndex) const { // Победа
-        for (int ind : beatsInd) {
-            if (ind == elementIndex) return true;
+    bool beats(int elementIndex) const {
+        for (int index : beatsIndices) {
+            if (index == elementIndex) return true;
         }
         return false;
     }
-    bool losesTo(int elementIndex) const { // Проигрыш
-        for (int ind : losesToInd) {
-            if (ind == elementIndex) return true;
+    bool losesTo(int elementIndex) const {
+        for (int index : losesToIndices) {
+            if (index == elementIndex) return true;
         }
         return false;
     }
 };
-// Карточка
+// Карточка для отображения элемента
 class Card {
 private:
     RectangleShape shape;
     Sprite sprite;
     Texture texture;
     bool isThrown;
-    Vector2f origPos;
-    Vector2f targetPos;
-    Vector2f origSize;
+    Vector2f originalPosition;
+    Vector2f targetPosition;
+    Vector2f originalSize;
     Vector2f targetSize;
     float animationSpeed;
     bool isHovered;
-    int elementInd;
+    int elementIndex;
     string elementName;
     string textureFile;
     bool textureLoaded;
 public:
-    Card(const Vector2f& position, const Vector2f& size, const Color& bgColor, int elemIndex, const string& name, const string& texFile) 
-        : isThrown(false), animationSpeed(8.0f), isHovered(false), elementInd(elemIndex), elementName(name), textureFile(texFile), 
-          textureLoaded(false) {
+    Card(const Vector2f& position, const Vector2f& size, const Color& bgColor, int elementIndex, const string& name, const string& texFile) 
+        : isThrown(false), animationSpeed(8.0f), isHovered(false), elementIndex(elementIndex), elementName(name), textureFile(texFile), 
+        textureLoaded(false) {
         shape = RectangleShape(size);
         shape.setFillColor(bgColor);
         shape.setOutlineThickness(2);
         shape.setOutlineColor(Color::Black);
         shape.setPosition(position);
-        origPos = position;
-        origSize = size;
-        targetPos = position;
+        originalPosition = position;
+        originalSize = size;
+        targetPosition = position;
         targetSize = size;
     }
     bool loadTexture() {
@@ -170,6 +161,8 @@ public:
     }
     void createDefaultTexture() {
         if (textureLoaded) return;
+        float width = shape.getSize().x - 10;
+        float height = shape.getSize().y - 10;
         updateSpritePosition();
     }
     void initializeTexture() {
@@ -179,13 +172,13 @@ public:
     }
     void throwTo(const Vector2f& position, const Vector2f& size) {
         isThrown = true;
-        targetPos = position;
+        targetPosition = position;
         targetSize = size;
     }
     void update(float deltaTime) {
         Vector2f currentPos = shape.getPosition();
         Vector2f currentSize = shape.getSize();
-        Vector2f newPos = currentPos + (targetPos - currentPos) * animationSpeed * deltaTime;
+        Vector2f newPos = currentPos + (targetPosition - currentPos) * animationSpeed * deltaTime;
         Vector2f newSize = currentSize + (targetSize - currentSize) * animationSpeed * deltaTime;
         shape.setPosition(newPos);
         shape.setSize(newSize);
@@ -195,12 +188,7 @@ public:
         if (!textureLoaded) return;
         FloatRect spriteBounds = sprite.getLocalBounds();
         Vector2f shapeSize = shape.getSize();
-        float scale;
-        if (isThrown) {
-            scale = min((shapeSize.x - 20) / spriteBounds.width, (shapeSize.y - 40) / spriteBounds.height);
-        } else {
-            scale = min((shapeSize.x - 20) / spriteBounds.width, (shapeSize.y - 40) / spriteBounds.height);
-        }
+        float scale = min((shapeSize.x - 20) / spriteBounds.width, (shapeSize.y - 40) / spriteBounds.height);
         sprite.setScale(scale, scale);
         FloatRect scaledBounds = sprite.getGlobalBounds();
         sprite.setPosition(
@@ -211,7 +199,7 @@ public:
     void setHovered(bool hovered) {
         isHovered = hovered;
         if (!isThrown) {
-            targetPos.y = hovered ? origPos.y - 20 : origPos.y;
+            targetPosition.y = hovered ? originalPosition.y - 20 : originalPosition.y;
         }
     }
     bool contains(const Vector2f& point) const {
@@ -225,28 +213,28 @@ public:
     }
     void reset() {
         isThrown = false;
-        targetPos = origPos;
-        targetSize = origSize;
+        targetPosition = originalPosition;
+        targetSize = originalSize;
     }
     void resetToOriginalPosition() {
         isThrown = false;
-        shape.setPosition(origPos);
-        shape.setSize(origSize);
-        targetPos = origPos;
-        targetSize = origSize;
+        shape.setPosition(originalPosition);
+        shape.setSize(originalSize);
+        targetPosition = originalPosition;
+        targetSize = originalSize;
         updateSpritePosition();
     }
     RectangleShape& getShape() { return shape; }
     bool isCardThrown() const { return isThrown; }
     Vector2f getPosition() const { return shape.getPosition(); }
     Vector2f getSize() const { return shape.getSize(); }
-    int getElementIndex() const { return elementInd; }
+    int getElementIndex() const { return elementIndex; }
     string getElementName() const { return elementName; }
     bool isTextureLoaded() const { return textureLoaded; }
-    Vector2f getOriginalPosition() const { return origPos; }
-    Vector2f getOriginalSize() const { return origSize; }
+    Vector2f getOriginalPosition() const { return originalPosition; }
+    Vector2f getOriginalSize() const { return originalSize; }
 };
-// Наши объекты
+// Конкретные игровые элементы
 class Rock : public GameElement {
 public:
     Rock() : GameElement("Камень", "rock.jpg", {1, 3}, {2, 4}) {}
@@ -282,7 +270,7 @@ public:
         return make_unique<Card>(position, size, bgColor, 4, "Спок", "spock.jpg");
     }
 };
-// Правила игры 
+// Правила игры
 class GameRules {
 private:
     vector<unique_ptr<GameElement>> elements;
@@ -295,7 +283,8 @@ public:
         elements.push_back(make_unique<Spock>());
     }
     bool beats(int attacker, int defender) const {
-        if (attacker < 0 || attacker >= elements.size() || defender < 0 || defender >= elements.size()) {
+        if (attacker < 0 || attacker >= elements.size() || 
+            defender < 0 || defender >= elements.size()) {
             return false;
         }
         return elements[attacker]->beats(defender);
@@ -371,6 +360,11 @@ public:
             }
         }
     }
+    void throwCardToPositionForDuel(const Vector2f& position) {
+        if (choice >= 0 && choice < static_cast<int>(cards.size())) {
+            cards[choice]->throwTo(position, Vector2f(140, 200));
+        }
+    }
     void update(float deltaTime, const Vector2f& mousePos = Vector2f()) {
         for (auto& card : cards) {
             card->update(deltaTime);       
@@ -399,9 +393,15 @@ public:
     void resetChoiceOnly() {
         choice = -1;
     }
-    void incrementScore() { score++; }
-    int getScore() const { return score; }
-    int getChoice() const { return choice; }
+    void incrementScore() { 
+        score++; 
+    }
+    int getScore() const { 
+        return score; 
+    }
+    int getChoice() const { 
+        return choice; 
+    }
     Card& getCard(int index) { 
         if (index >= 0 && index < static_cast<int>(cards.size())) {
             return *cards[index];
@@ -414,19 +414,37 @@ public:
         }
         return nullptr;
     }
-    bool isPlayerHuman() const { return isHuman; }
-    string getName() const { return playerName; }
-    int getNumberOfCards() const { return static_cast<int>(cards.size()); }
-    void resetScore() { score = 0; }
-    void setChoice(int newChoice) { choice = newChoice; }
-    bool hasMadeChoice() const { return choice != -1; }
+    Card* getChosenCard() {
+        if (choice >= 0 && choice < static_cast<int>(cards.size())) {
+            return cards[choice].get();
+        }
+        return nullptr;
+    }
+    bool isPlayerHuman() const { 
+        return isHuman; 
+    }
+    string getName() const { 
+        return playerName; 
+    }
+    int getNumberOfCards() const { 
+        return static_cast<int>(cards.size()); 
+    }
+    void resetScore() { 
+        score = 0; 
+    }
+    void setChoice(int newChoice) { 
+        choice = newChoice; 
+    }
+    bool hasMadeChoice() const { 
+        return choice != -1; 
+    }
 };
 // Бот
 class Bot : public Player {
 public:
     Bot(float x, float y, const Color& botColor, const string& name) : Player(x, y, botColor, name, false) {}
 };
-// Анимация креста
+// Анимация креста для проигравших карт
 class AnimatedCross {
 private:
     RectangleShape line1;
@@ -450,7 +468,7 @@ public:
         size = cardSize;
         progress = 0.0f;
         active = true;
-        animationClock.restart();   
+        animationClock.restart();
         Vector2f center = pos + cardSize / 2.0f;
         line1.setPosition(center);
         line2.setPosition(center);
@@ -458,7 +476,7 @@ public:
         line2.setRotation(-45);
     }
     void update() {
-        if (!active) return;   
+        if (!active) return;
         float elapsed = animationClock.getElapsedTime().asSeconds();
         progress = min(elapsed / 0.5f, 1.0f);
         float diagonal = std::sqrt(size.x * size.x + size.y * size.y);
@@ -483,9 +501,11 @@ public:
         line1.setSize(Vector2f(0, 6));
         line2.setSize(Vector2f(0, 6));
     }
-    bool isActive() const { return active; }
+    bool isActive() const { 
+        return active; 
+    }
 };
-// Сама игра 
+// Основной класс игры
 class Game : public IGameController {
 private:
     RenderWindow window;
@@ -503,7 +523,6 @@ private:
     Text scoreTextBot1;
     Text scoreTextBot2;
     Text victoryText;
-    Text restartText;
     Text duelText;
     Text instructionText;
     bool roundInProgress;
@@ -554,10 +573,6 @@ public:
         victoryText.setCharacterSize(60);
         victoryText.setFillColor(Color::Yellow);
         victoryText.setStyle(Text::Bold);
-        restartText.setFont(font);
-        restartText.setCharacterSize(30);
-        restartText.setFillColor(Color::Cyan);
-        restartText.setString(L"Нажмите ПРОБЕЛ для новой игры");
         duelText.setFont(font);
         duelText.setCharacterSize(30);
         duelText.setFillColor(Color::Yellow);
@@ -598,29 +613,6 @@ public:
             bot2->makeChoice(choice);
         }
     }
-    void restartGame() override {
-        gameOver = false;
-        winnerName = L"";
-        player->resetScore();
-        bot1->resetScore();
-        bot2->resetScore();
-        player->resetToOriginalPositions();
-        bot1->resetToOriginalPositions();
-        bot2->resetToOriginalPositions();
-        crossPlayer.reset();
-        crossBot1.reset();
-        crossBot2.reset();
-        roundInProgress = false;
-        roundFinished = false;
-        isDuelMode = false;
-        preparingForDuel = false;
-        duelParticipants.clear();
-        waitingForPlayerChoiceInDuel = false;
-        choicesRevealed = false;
-        duelRoundCount = 0;
-        updateScoreDisplay();
-        commandInvoker.clearHistory();
-    }
     void prepareForDuel(int participant1, int participant2) override {
         preparingForDuel = true;
         isDuelMode = false;
@@ -642,11 +634,11 @@ public:
         FloatRect textRect = duelText.getLocalBounds();
         duelText.setOrigin(textRect.left + textRect.width / 2.0f, textRect.top + textRect.height / 2.0f);
         duelText.setPosition(850, 320);
-    }
+    }   
 private:
     void loadFont() {
         vector<string> fontPaths = {
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
         };
         bool fontLoaded = false;
         for (const auto& path : fontPaths) {
@@ -702,9 +694,6 @@ private:
             FloatRect textRect = victoryText.getLocalBounds();
             victoryText.setOrigin(textRect.left + textRect.width / 2.0f,textRect.top + textRect.height / 2.0f);
             victoryText.setPosition(850, 250);
-            FloatRect restartRect = restartText.getLocalBounds();
-            restartText.setOrigin(restartRect.left + restartRect.width / 2.0f,restartRect.top + restartRect.height / 2.0f);
-            restartText.setPosition(850, 350);
         }
     }
     void processEvents() {
@@ -712,14 +701,6 @@ private:
         while (window.pollEvent(event)) {
             if (event.type == Event::Closed) {
                 window.close();
-            }
-            if (event.type == Event::KeyPressed && gameOver) {
-                if (event.key.code == Keyboard::Space) {
-                    commandInvoker.executeCommand(make_unique<RestartGameCommand>(this));
-                }
-                else if (event.key.code == Keyboard::Y && event.key.control) {
-                    commandInvoker.redo();
-                }
             }
             if (event.type == Event::MouseButtonPressed) {
                 Vector2f mousePos = window.mapPixelToCoords(Mouse::getPosition(window));
@@ -731,19 +712,19 @@ private:
                                 commandInvoker.executeCommand(
                                     make_unique<PlayerChoiceCommand>(this, 0, i)
                                 );
-                                waitingForPlayerChoiceInDuel = false;
-                                // Боты делают выбор сразу
-                                if (find(duelParticipants.begin(), duelParticipants.end(), 1) != duelParticipants.end()) {
+                                // Автоматически делаем выбор для второго участника дуэли
+                                int otherParticipant = (duelParticipants[0] == 0) ? duelParticipants[1] : duelParticipants[0];
+                                if (otherParticipant == 1) {
                                     commandInvoker.executeCommand(
                                         make_unique<PlayerChoiceCommand>(this, 1, -1)
                                     );
-                                }
-                                if (find(duelParticipants.begin(), duelParticipants.end(), 2) != duelParticipants.end()) {
+                                } else if (otherParticipant == 2) {
                                     commandInvoker.executeCommand(
                                         make_unique<PlayerChoiceCommand>(this, 2, -1)
                                     );
                                 }
-                                // Сразу выбрасываем карты для дуэли
+                                waitingForPlayerChoiceInDuel = false;
+                                // Бросаем карты для дуэли
                                 throwCardsForDuel();
                                 revealClock.restart();
                                 break;
@@ -767,20 +748,23 @@ private:
     }
     void throwCardsForDuel() {
         if (duelParticipants.size() != 2) return;
-        // Если дуэль между игроком и ботом 1
-        if ((duelParticipants[0] == 0 && duelParticipants[1] == 1) || (duelParticipants[0] == 1 && duelParticipants[1] == 0)) {
-            player->throwCardToPosition(0);  
-            bot1->throwCardToPosition(1);    
+        Vector2f duelPositionLeft(650, 250);
+        Vector2f duelPositionRight(950, 250);
+        int p1 = duelParticipants[0];
+        int p2 = duelParticipants[1];
+        if (p1 == 0) {
+            player->throwCardToPositionForDuel(duelPositionLeft);
+        } else if (p1 == 1) {
+            bot1->throwCardToPositionForDuel(duelPositionLeft);
+        } else if (p1 == 2) {
+            bot2->throwCardToPositionForDuel(duelPositionLeft);
         }
-        // Если дуэль между игроком и ботом 2
-        else if ((duelParticipants[0] == 0 && duelParticipants[1] == 2) || (duelParticipants[0] == 2 && duelParticipants[1] == 0)) {
-            player->throwCardToPosition(0);  
-            bot2->throwCardToPosition(2);    
-        }
-        // Если дуэль между ботами
-        else if ((duelParticipants[0] == 1 && duelParticipants[1] == 2) || (duelParticipants[0] == 2 && duelParticipants[1] == 1)) {
-            bot1->throwCardToPosition(1);    
-            bot2->throwCardToPosition(2);    
+        if (p2 == 0) {
+            player->throwCardToPositionForDuel(duelPositionRight);
+        } else if (p2 == 1) {
+            bot1->throwCardToPositionForDuel(duelPositionRight);
+        } else if (p2 == 2) {
+            bot2->throwCardToPositionForDuel(duelPositionRight);
         }
     }
     void update(float deltaTime) {
@@ -803,8 +787,7 @@ private:
             if (!choicesRevealed) {
                 float elapsed = revealClock.getElapsedTime().asSeconds();
                 if (elapsed > 0.5f) {
-                    if (isDuelMode) {
-                    } else {
+                    if (!isDuelMode) {
                         player->throwCardToPosition(0);
                         bot1->throwCardToPosition(1);
                         bot2->throwCardToPosition(2);
@@ -835,7 +818,6 @@ private:
         window.draw(scoreTextBot1);
         window.draw(scoreTextBot2);
         if (!roundInProgress && !gameOver && !isDuelMode && !preparingForDuel) {
-            window.draw(instructionText);
         }
         if ((isDuelMode || preparingForDuel) && roundInProgress) {
             window.draw(duelText);
@@ -845,7 +827,6 @@ private:
             overlay.setFillColor(Color(0, 0, 0, 180));
             window.draw(overlay);
             window.draw(victoryText);
-            window.draw(restartText);
         }
         window.display();
     }
@@ -857,21 +838,24 @@ private:
         crossPlayer.reset();
         crossBot1.reset();
         crossBot2.reset();
-        if (duelParticipants[0] == 0 || duelParticipants[1] == 0) {
+        if (duelParticipants.size() != 2) return;
+        bool playerInDuel = (duelParticipants[0] == 0 || duelParticipants[1] == 0);
+        if (playerInDuel) {
             // Игрок участвует в дуэли
             player->resetChoiceOnly();
             waitingForPlayerChoiceInDuel = true;
             string names[] = {"Игрок", "Бот 1", "Бот 2"};
-            wstring duelMsg = L"ДУЭЛЬ: " + stringToWstring(names[duelParticipants[0]]) + L" vs " + stringToWstring(names[duelParticipants[1]]) + 
-                              L"\nИгрок, выберите карту!";
+            wstring duelMsg = L"ДУЭЛЬ: " + stringToWstring(names[duelParticipants[0]]) + 
+                             L" vs " + stringToWstring(names[duelParticipants[1]]) + 
+                             L"\nИгрок, выберите карту!";
             duelText.setString(duelMsg);
             FloatRect textRect = duelText.getLocalBounds();
             duelText.setOrigin(textRect.left + textRect.width / 2.0f,textRect.top + textRect.height / 2.0f);
             duelText.setPosition(850, 320);
         } else {
+            // Дуэль между ботами
             waitingForPlayerChoiceInDuel = false;
-            bot1->resetChoiceOnly();
-            bot2->resetChoiceOnly();
+            // Боты делают выбор
             if (duelParticipants[0] == 1 || duelParticipants[1] == 1) {
                 bot1->makeChoice();
             }
@@ -892,7 +876,7 @@ private:
         if (gameOver) return;
         int playerChoice = player->getChoice();
         int bot1Choice = bot1->getChoice();
-        int bot2Choice = bot2->getChoice();
+        int bot2Choice = bot2->getChoice();       
         if (isDuelMode) {
             if (duelParticipants.size() == 2) {
                 int p1 = duelParticipants[0];
@@ -902,16 +886,13 @@ private:
                 if (choice1 == -1 || choice2 == -1) {
                     return; 
                 }
-                // Обработка ситуации, когда выбраны одинаковые карты в дуэли
                 if (choice1 == choice2) {
-                    // Сбрасываем выборы и начинаем новую дуэль с теми же участниками
                     if (p1 == 0) player->resetChoiceOnly();
                     else if (p1 == 1) bot1->resetChoiceOnly();
-                    else if (p1 == 2) bot2->resetChoiceOnly();
+                    else if (p1 == 2) bot2->resetChoiceOnly();                   
                     if (p2 == 0) player->resetChoiceOnly();
                     else if (p2 == 1) bot1->resetChoiceOnly();
                     else if (p2 == 2) bot2->resetChoiceOnly();
-                    // Возвращаем карты на исходные позиции
                     player->resetToOriginalPositions();
                     bot1->resetToOriginalPositions();
                     bot2->resetToOriginalPositions();
@@ -944,10 +925,7 @@ private:
             roundFinished = true;
             return;
         }
-        if (playerChoice == bot1Choice && bot1Choice == bot2Choice) {
-            // Ничья для всех - ничего не делаем
-        } 
-        else if (playerChoice == bot1Choice) {
+        if (playerChoice == bot1Choice) {
             if (rules.beats(bot2Choice, playerChoice)) {
                 awardWinner(2);
                 animateCrossForLoser(0);
@@ -1011,20 +989,11 @@ private:
     void animateCrossForLoser(int loserIndex) {
         Card* card = nullptr;
         if (loserIndex == 0) {
-            int choice = player->getChoice();
-            if (choice >= 0) {
-                card = player->getCardPtr(choice);
-            }
+            card = player->getChosenCard();
         } else if (loserIndex == 1) {
-            int choice = bot1->getChoice();
-            if (choice >= 0) {
-                card = bot1->getCardPtr(choice);
-            }
+            card = bot1->getChosenCard();
         } else if (loserIndex == 2) {
-            int choice = bot2->getChoice();
-            if (choice >= 0) {
-                card = bot2->getCardPtr(choice);
-            }
+            card = bot2->getChosenCard();
         }
         if (card) {
             if (loserIndex == 0) {
@@ -1058,6 +1027,7 @@ private:
         isDuelMode = false;
         waitingForPlayerChoiceInDuel = false;
         roundFinished = true;
+        
         if (!gameOver) {
             checkGameOver();
         }
@@ -1081,7 +1051,7 @@ private:
     }
 };
 int main() {
-    srand(static_cast<unsigned int>(std::time(nullptr)));
+    srand(static_cast<unsigned int>(time(nullptr)));
     locale::global(locale("ru_RU.UTF-8"));
     Game game;
     game.run();
