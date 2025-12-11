@@ -31,7 +31,6 @@ public:
             this_thread::sleep_for(chrono::seconds(5));
             {
                 unique_lock<mutex> lock(waiterMutex);
-                // ИСПРАВЛЕНО: проверяем конкретные вилки, которые нужны философу
                 cv.wait(lock, [this]() { 
                     return forks[lfork] && forks[rfork]; 
                 });
