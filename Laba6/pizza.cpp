@@ -388,7 +388,7 @@ public:
     }
 };
 int main() {
-    string conninfo = "host=localhost dbname=pizzeria user=postgres password=#Objec1ioN! port=5432";
+    string conninfo = "host=localhost dbname=pizzeria user=postgres port=5432";
     Database db(conninfo);
     if (db.isConnected()) {
         cout << "Успешное подключение к базе данных!\n" << endl;
