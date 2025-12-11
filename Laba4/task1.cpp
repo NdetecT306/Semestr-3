@@ -120,9 +120,9 @@ void randomChars(int id, int summ) {
 int main() {
     cout << "Barrier: " << endl;
     vector<thread> thBar;
-    barrier<> mybar(5);
+    barrier<> mybar(100);
     auto startBar = high_resolution_clock::now(); 
-    for(int i = 0; i < 50; i++) {
+    for(int i = 0; i < 100; i++) {
         thBar.emplace_back(bar, i, ref(mybar) ,15);
     }
     for(auto& t : thBar) {
@@ -135,7 +135,7 @@ int main() {
     cout << "Monitor: " << endl;
     vector<thread> thMon;
     auto start = high_resolution_clock::now(); 
-    for(int i = 0; i < 50; i++) {
+    for(int i = 0; i < 100; i++) {
         thMon.emplace_back(myMonitor, i, 15);
     }
     for(auto& t : thMon) {
@@ -148,7 +148,7 @@ int main() {
     cout << "Mytexes: " << endl;
     vector<thread> threads;
     start = high_resolution_clock::now(); 
-    for(int i = 0; i < 50; i++) {
+    for(int i = 0; i < 100; i++) {
         threads.emplace_back(myMutexes, i, 15);
     }
     for(auto& t : threads) {
@@ -161,7 +161,7 @@ int main() {
     cout << "Semaphore: " << endl;
     vector<thread> thSem;
     start = high_resolution_clock::now(); 
-    for(int i = 0; i < 50; i++) {
+    for(int i = 0; i < 100; i++) {
         thSem.emplace_back(mySem, i, 15);
     }
     for(auto& t : thSem) {
@@ -174,7 +174,7 @@ int main() {
     cout << "SpinLock: " << endl;
     vector<thread> thSpL;
     start = high_resolution_clock::now(); 
-    for(int i = 0; i < 50; i++) {
+    for(int i = 0; i < 100; i++) {
         thSpL.emplace_back(mySpinLock, i, 15);
     }
     for(auto& t : thSpL) {
@@ -187,7 +187,7 @@ int main() {
     cout << "SpinWait: " << endl;
     vector<thread> thSpW;
     start = high_resolution_clock::now();
-    for (int i = 0; i < 50; ++i) { 
+    for (int i = 0; i < 100; ++i) { 
         thSpW.push_back(thread(randomChars, i, 10));
     }
     for (auto& t : thSpW) {
