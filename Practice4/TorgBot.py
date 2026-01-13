@@ -43,10 +43,10 @@ class TorgBot:
                     self.user_key = result["key"]
                     if "user_id" in result:
                         self.user_id = result["user_id"]
-                    print(f"[Бот {self.bot_id:2d}] Пользователь создан")
+                    print(f"Бот {self.bot_id:2d} Пользователь создан")
                     return True
                 elif "error" in result:
-                    print(f"[Бот {self.bot_id:2d}] Ошибка: {result['error'][:50]}")
+                    print(f"Бот {self.bot_id:2d} Ошибка: {result['error'][:50]}")
                     if "existing_user_id" in result:
                         self.username = f"trader_{self.bot_id}_{random.randint(10000, 99999)}"
                         return self.create_user()
@@ -345,8 +345,7 @@ class TorgBot:
         if success:
             self.order_counter += 1
             self.last_order_time = time.time()  # Обновляем время последнего ордера
-            print(f"Бот {self.bot_id:2d}: Ордер: {order_type.upper()} {sale_lot_name}/{buy_lot_name} "
-                  f"price: {order_price:.3f} quantity: {quantity:.2f}")
+            print(f"Бот {self.bot_id:2d}: Ордер: {order_type.upper()} {sale_lot_name}/{buy_lot_name} "f"price: {order_price:.3f} quantity: {quantity:.2f}")
             return True
         else:
             self.errors_count += 1
@@ -537,8 +536,8 @@ class BotManager:
         if elapsed > 0:
             orders_per_sec = total_orders / elapsed
             cancels_per_sec = total_cancels / elapsed
-            print(f"⚡ Скорость создания: {orders_per_sec:.2f} ордеров/сек")
-            print(f"⚡ Скорость отмены: {cancels_per_sec:.2f} отмен/сек")
+            print(f"Скорость создания: {orders_per_sec:.2f} ордеров/сек")
+            print(f"Скорость отмены: {cancels_per_sec:.2f} отмен/сек")
         print("\nСтатистика по ботам:")
         GREEN = "\033[92m"  # Зеленый
         RED = "\033[91m"    # Красный
